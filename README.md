@@ -11,4 +11,4 @@ You can click the Preview link to take a look at your changes.
 - now I'm testing updating stuff
 
 
-![alternative text](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.github.com/plantuml/plantuml-server/master/src/main/webapp/resource/test2diagrams.txt)
+![alternative text](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/masonjon-kt/masonje79/main/test.uml)
