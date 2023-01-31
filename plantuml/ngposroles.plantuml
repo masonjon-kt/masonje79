@@ -1,69 +1,96 @@
 @startuml
+skinparam linetype polyline
+skinparam linetype ortho
 
-
-' roles
-frame "KPS ngpost Admin" as roleadmin {
-  [gAD8828kpsazcngpostadmin]
-}
-frame "KPS ngpost Approver" as roleApprover {
-  [gAD8828kpsazcngpostapprover]
-}
-frame "KPS ngpost Cluster Contributor (PIM)" as roleContributor {
-  [gAD8828ngpostRGContributorPIM]
-}
-frame "KPS ngpost Cluster Reader" as roleReader {
-  [gAD8828ngpostRGReader]
-}
-frame "KPS ngpost Developer" as roleReader {
-  [gAD8828kpsazcngpostdev]
-}
-frame "KPS ngpost Viewer" as roleViewer {
-  [gAD8828kpsazcngpostview]
-}
+class "boo"
 
 ' resources
-node "AZ Res Grp rg8828ngpostdev_" as azDev {
-  [Owner (Service Accounts/Principals)] as azDo
-  [Contributor (Service Accounts/Principals)] as azDc
-  [Reader] as azDr
-  [Owner (PIM)] as azDop
-  [Contributor (PIM)] as azDcp
-} 
+node "resources" {
+  node "AZ Res Grp rg8828ngpostdev_" as azDev {
+    [Owner (Service Accounts/Principals)] as azDo
+    [Contributor (Service Accounts/Principals)] as azDc
+    [Reader] as azDr
+    [Owner (PIM)] as azDop
+    [Contributor (PIM)] as azDcp
+  } 
 
-node "AZ Res Grp rg8828ngpostprod_" as azProd {
-  [Owner (Service Accounts/Principals)] as azPo
-  [Contributor (Service Accounts/Principals)] as azPc
-  [Reader] as azPr
-  [Owner (PIM)] as azPop
-  [Contributor (PIM)] as azPcp
+  node "AZ Res Grp rg8828ngpostprod_" as azProd {
+    [Owner (Service Accounts/Principals)] as azPo
+    [Contributor (Service Accounts/Principals)] as azPc
+    [Reader] as azPr
+    [Owner (PIM)] as azPop
+    [Contributor (PIM)] as azPcp
+  }
+  node "AZ Res Grp rg8828ngpoststage_" as azStage {
+    [Owner (Service Accounts/Principals)] as azSo
+    [Contributor (Service Accounts/Principals)] as azSc
+    [Reader] as azSr
+    [Owner (PIM)] as azSop
+    [Contributor (PIM)] as azScp
+  }
+
+  node "KPS Platform - Azure Cloud - Non Prod" as azCnp {
+    [Runs on] as azCnpro
+    [Project Viewer] as azCnpV
+    [Project Admin] as azCnprA
+    [Project Developer] as azCnprD
+  }
+
+  node "KPS Platform - Azure Cloud - Prod" as azCp {
+    [Runs on] as azCpro
+    [Project Viewer] as azCpV
+    [Project Admin] as azCprA
+    [Project Developer] as azCprD
+  }
+
+  node "Dynatrace Managed" as dtm {
+    [Admin] as dtmAdmin
+    [Connect and Utilize Application] as dtmConnect
+    [Utilize applicatoin] as dtmUa
+  } 
 }
-node "AZ Res Grp rg8828ngpoststage_" as azStage {
-  [Owner (Service Accounts/Principals)] as azSo
-  [Contributor (Service Accounts/Principals)] as azSc
-  [Reader] as azSr
-  [Owner (PIM)] as azSop
-  [Contributor (PIM)] as azScp
+
+' roles
+node "roles" {
+  frame "KPS ngpost Admin" as roleadmin {
+    [gAD8828kpsazcngpostadmin]
+  }
+  frame "KPS ngpost Approver" as roleApprover {
+    [gAD8828kpsazcngpostapprover]
+  }
+  frame "KPS ngpost Cluster Contributor (PIM)" as roleContributor {
+    [gAD8828ngpostRGContributorPIM]
+  }
+  frame "KPS ngpost Cluster Reader" as roleReader {
+    [gAD8828ngpostRGReader]
+  }
+  frame "KPS ngpost Developer" as roleDeveloper {
+    [gAD8828kpsazcngpostdev]
+  }
+  frame "KPS ngpost Viewer" as roleViewer {
+    [gAD8828kpsazcngpostview]
+  }
 }
+roles -right[hidden]- resources
 
+roleadmin -down[hidden]- roleApprover
+roleApprover -down[hidden]- roleContributor
+roleContributor -down[hidden]- roleReader
+roleReader -down[hidden]- roleDeveloper
+roleDeveloper -down[hidden]- roleViewer
 
-node "KPS Platform - Azure Cloud - Non Prod" as azCnp {
-  [Runs on] as azCnpro
-  [Project Viewer] as azCnpV
-  [Project Admin] as azCnprA
-  [Project Developer] as azCnprD
-}
+azDev -down[hidden]-- azProd
+azProd -down[hidden]-- azStage
+azStage -down[hidden]-- azCnp
+azCnp -down[hidden]-- azCp
+azCp -down[hidden]-- dtm
 
-node "KPS Platform - Azure Cloud - Prod" as azCp {
-  [Runs on] as azCpro
-  [Project Viewer] as azCpV
-  [Project Admin] as azCprA
-  [Project Developer] as azCprD
-}
+roleDeveloper -> dtmConnect
+roleDeveloper -> azCnprD
+roleDeveloper -> azCprD
 
-node "Dynatrace Managed" as dtm {
-  [Admin] as dtmAdmin
-  [Connect and Utilize Application] as dtmConnect
-  [Utilize applicatoin] as dtmUa
-} 
+roleadmin -> dtmConnect
+roleadmin -> azCnprD
+roleadmin -> azCprA
 
 @enduml
