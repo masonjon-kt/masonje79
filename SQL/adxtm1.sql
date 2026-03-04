@@ -3,7 +3,6 @@ SELECT
     c.node,
     left(right(f.name, 7), 3) as lane,
     fh.modification_time
-    ,fh.*
 FROM dbo.controllers c 
 INNER JOIN dbo.fcd_file_history fh 
         ON ( c.controller_ID = fh.controllerID) 
@@ -15,9 +14,9 @@ where
         f.name like 'c:\ADX_STLD\ADXTM%'
         and f.name != 'C:\ADX_STLD\ADXTMCLN.LOG'
         
-        and cm.abbreviation like 'di'
-        and c.store like '0054'
+        and cm.abbreviation like 'ru'
+        and c.store like '0222'
         
         and fh.current_version = 'true'
         and fh.reason_file_deleted = 'false'
-order by fh.last_updated desc
+order by Store, lane asc

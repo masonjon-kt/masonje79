@@ -6,8 +6,8 @@ import requests
 
 # Set your vSphere connection details here
 VSPHERE_HOST = 'u060dvc11.kroger.com'
-VSPHERE_USER = '<euid>@kroger.com'
-VSPHERE_PASSWORD = '<pwd>'
+VSPHERE_USER = 'jm43349@kroger.com'
+VSPHERE_PASSWORD = 'Live4Him1$'
 
 PostUpdateURL = 'https://kproductivity.webhook.office.com/webhookb2/42affb90-f8e8-474a-a3f3-405201252dac@8331e14a-9134-4288-bf5a-5e2c8412f074/IncomingWebhook/d50e646c2656483982bfc46404443c95/be636d1f-2905-4507-a388-664f7ecf3202/V2miSnVPzEOW3WGJmruHDvrT6zpnB89jhdqHxiLvaOTTc1'
 PostText = {
