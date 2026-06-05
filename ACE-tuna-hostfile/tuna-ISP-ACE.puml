@@ -1,0 +1,60 @@
+@startuml
+title Tuna -> ISP -> Store Controller (POS) Host Sync
+
+autonumber
+skinparam backgroundColor #FAFAF7
+skinparam sequence {
+	ArrowColor #2D5B87
+	LifeLineBorderColor #2D5B87
+	LifeLineBackgroundColor #F1F6FB
+	ParticipantBorderColor #355E3B
+	ParticipantBackgroundColor #EEF6EE
+	ParticipantFontColor #1F2A1F
+}
+
+actor "Tech/Process" as Tech
+participant "TUNA" as TUNA
+participant "ISP" as ISP
+participant "Store Controller\n(POS)" as POS
+
+note over TUNA,POS
+Scope is small at a basic-operations level, but host sync is the most complex path
+because ISP performs most transformation and orchestration steps.
+end note
+
+== Initial Sync Payload ==
+Tech -> TUNA: Makes changes in TUNA
+TUNA -> TUNA: Tuna update process triggers\nPOS host file update process
+TUNA -> ISP: Copy hosts, resolv, and bootptab
+note right of ISP
+bootptab is generated from /ha/dhcptab for ISP script compatibility.
+end note
+
+== ISP Processing Loop ==
+loop Repeat while new LANE assignments are discovered
+	ISP -> ISP: Receive hosts, resolv, bootptab
+	ISP -> POS: Push resolv file
+	ISP -> POS: Pull hosts file
+	ISP -> ISP: Extract LANE assignments and adxautonet entries
+
+	alt New LANE assignments found
+		ISP -> TUNA: Send new LANE data
+		TUNA -> TUNA: Rebuild hosts file with new LANEs
+		TUNA -> ISP: Send updated hosts/resolv/bootptab
+	else No new LANE assignments
+		ISP -> ISP: Continue processing
+	end
+end
+
+== Final Host File Transformation ==
+ISP -> ISP: Remove xx and DHCP entries from hosts
+ISP -> ISP: Add MAC addresses as comments
+ISP -> ISP: Reinsert adxautonet entries
+ISP -> POS: Deliver final host file
+
+note over ISP,POS
+Final result: POS receives resolved resolv and transformed host file.
+end note
+
+@enduml
+
