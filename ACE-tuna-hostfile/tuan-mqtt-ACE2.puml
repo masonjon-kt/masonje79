@@ -1,0 +1,50 @@
+@startuml
+title Tuna <-> MQTT <-> Store Controller (POS) Host Sync
+
+autonumber
+skinparam backgroundColor #FAFAF7
+skinparam sequence {
+	ArrowColor #2D5B87
+	LifeLineBorderColor #2D5B87
+	LifeLineBackgroundColor #F1F6FB
+	ParticipantBorderColor #355E3B
+	ParticipantBackgroundColor #EEF6EE
+	ParticipantFontColor #1F2A1F
+}
+
+actor "Tech/Process" as Tech
+participant "TUNA" as TUNA
+participant "MQTT Broker" as MQTT
+participant "Store Controller\n(POS)" as POS
+
+note over TUNA,POS
+Host sync no longer depends on ISP for file processing.
+TUNA notifies by MQTT, then POS downloads files via REST and processes locally.
+end note
+
+== Change Trigger ==
+Tech -> TUNA: Makes changes in TUNA
+TUNA -> TUNA: Build latest hosts, resolv, and bootptab payload
+
+== Notification Layer ==
+TUNA -> MQTT: Publish host-sync notification\n(topic: store/<id>/hostsync)
+MQTT -> POS: Deliver host-sync notification
+POS -> POS: Update event received host-sync notification
+
+== Controller Pulls Files ==
+POS -> TUNA: REST GET /hostsync/hosts
+TUNA --> POS: hosts file
+POS -> TUNA: REST GET /hostsync/resolv
+TUNA --> POS: resolv file
+
+== Controller Local Processing ==
+POS -> POS: Validate and stage downloaded files
+POS -> POS: Apply resolv and final hosts file locally
+POS -> POS: Send system message stating new hosts and resolv files have been applied
+
+note over POS
+File deployment now delivered via MQTT notification and REST API, eliminating dependency on ISP for file deployment.
+end note
+
+@enduml
+
