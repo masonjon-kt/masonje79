@@ -13,6 +13,13 @@ Options:
   --search    Search pattern (supports wildcards: *, ?, [seq]); required with --delete
   --create    Create the file if it does not exist (true/false)
   --delete    Delete lines matching the search pattern (requires --search)
+
+Exit codes:
+  0  Success
+  1  Target file not found and --create is not true
+  2  File could not be created
+  3  File could not be read
+  4  File could not be written
 """
 import argparse
 import fnmatch
@@ -28,14 +35,22 @@ def match_line(pattern, line):
 def process_file(file_path, search_pattern, insert_value, create, delete):
     if not os.path.exists(file_path):
         if create:
-            open(file_path, 'w').close()
-            print(f"Created file: {file_path}")
+            try:
+                open(file_path, 'w').close()
+                print(f"Created file: {file_path}")
+            except OSError as e:
+                print(f"Error: could not create file '{file_path}': {e}", file=sys.stderr)
+                sys.exit(2)
         else:
             print(f"Error: target file not found: {file_path}", file=sys.stderr)
             sys.exit(1)
 
-    with open(file_path, 'r') as f:
-        lines = f.readlines()
+    try:
+        with open(file_path, 'r') as f:
+            lines = f.readlines()
+    except OSError as e:
+        print(f"Error: could not read file '{file_path}': {e}", file=sys.stderr)
+        sys.exit(3)
 
     # No search pattern — plain append if value not already present
     if search_pattern is None:
@@ -44,11 +59,15 @@ def process_file(file_path, search_pattern, insert_value, create, delete):
             if insert_value in existing:
                 print(f"Value already exists in file: {insert_value}")
             else:
-                with open(file_path, 'a') as f:
-                    if lines and not lines[-1].endswith('\n'):
-                        f.write('\n')
-                    f.write(insert_value + '\n')
-                print(f"Inserted: {insert_value}")
+                try:
+                    with open(file_path, 'a') as f:
+                        if lines and not lines[-1].endswith('\n'):
+                            f.write('\n')
+                        f.write(insert_value + '\n')
+                    print(f"Inserted: {insert_value}")
+                except OSError as e:
+                    print(f"Error: could not write to file '{file_path}': {e}", file=sys.stderr)
+                    sys.exit(4)
         return
 
     new_lines = []
@@ -84,12 +103,20 @@ def process_file(file_path, search_pattern, insert_value, create, delete):
             print(f"No match found for '{search_pattern}'. Inserted: {insert_value}")
         else:
             print(f"No match found for '{search_pattern}'. Nothing changed.")
-        with open(file_path, 'w') as f:
-            f.writelines(new_lines)
+        try:
+            with open(file_path, 'w') as f:
+                f.writelines(new_lines)
+        except OSError as e:
+            print(f"Error: could not write to file '{file_path}': {e}", file=sys.stderr)
+            sys.exit(4)
         return
 
-    with open(file_path, 'w') as f:
-        f.writelines(new_lines)
+    try:
+        with open(file_path, 'w') as f:
+            f.writelines(new_lines)
+    except OSError as e:
+        print(f"Error: could not write to file '{file_path}': {e}", file=sys.stderr)
+        sys.exit(4)
 
     if delete:
         print(f"Deleted {matched_count} line(s) matching '{search_pattern}'.")
@@ -99,7 +126,16 @@ def process_file(file_path, search_pattern, insert_value, create, delete):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Insert, replace, or delete lines in a file using wildcard search patterns."
+        description="Insert, replace, or delete lines in a file using wildcard search patterns.",
+        epilog=(
+            "Exit codes:\n"
+            "  0  Success\n"
+            "  1  Target file not found and --create is not true\n"
+            "  2  File could not be created\n"
+            "  3  File could not be read\n"
+            "  4  File could not be written"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--file", required=True, help="Target file path")
     parser.add_argument("--search", default=None, help="Search pattern (supports wildcards: *, ?, [seq]). Required with --delete.")
