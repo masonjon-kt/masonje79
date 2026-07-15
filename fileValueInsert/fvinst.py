@@ -34,6 +34,9 @@ def match_line(pattern, line):
 
 def process_file(file_path, search_pattern, insert_value, create, delete):
     if not os.path.exists(file_path):
+        if delete:
+            print(f"Error: target file not found: {file_path}", file=sys.stderr)
+            sys.exit(1)
         if create:
             try:
                 open(file_path, 'w').close()
@@ -94,6 +97,10 @@ def process_file(file_path, search_pattern, insert_value, create, delete):
         print(f"Value already exists in file: {insert_value}")
         return
 
+    if delete and matched_count == 0:
+        print(f"No matches found for '{search_pattern}'. Nothing deleted.")
+        return
+
     if matched_count == 0 and not delete:
         if insert_value is not None:
             # No match found — insert the value as a new line
@@ -137,14 +144,16 @@ def main():
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--file", required=True, help="Target file path")
-    parser.add_argument("--search", default=None, help="Search pattern (supports wildcards: *, ?, [seq]). Required with --delete.")
+    parser.add_argument("-f", "--file", required=True, help="Target file path")
+    parser.add_argument("-s", "--search", default=None, help="Search pattern (supports wildcards: *, ?, [seq]). Required with --delete.")
     parser.add_argument(
+        "-i",
         "--insert",
         default=None,
         help="Value to insert into the file. Inserted if no match found; replaces matching lines if found. Omit when using --delete.",
     )
     parser.add_argument(
+        "-c",
         "--create",
         type=lambda x: x.lower() in ("true", "1", "yes"),
         default=False,
@@ -152,6 +161,7 @@ def main():
         help="Create the file if it does not exist (true/false)",
     )
     parser.add_argument(
+        "-d",
         "--delete",
         action="store_true",
         help="Delete lines matching the search pattern instead of replacing them",
@@ -161,6 +171,8 @@ def main():
 
     if args.delete and args.insert is not None:
         parser.error("--delete cannot be used together with --insert.")
+    if args.delete and args.create:
+        parser.error("--delete cannot be used together with --create.")
     if args.delete and args.search is None:
         parser.error("--delete requires --search.")
     if args.search is not None and args.insert is None and not args.delete:
