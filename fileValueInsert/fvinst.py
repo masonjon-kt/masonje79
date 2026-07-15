@@ -14,6 +14,7 @@ Options:
     -s, --search    Search pattern (supports wildcards: *, ?, [seq]); required with --delete
     -c, --create    Create the file if it does not exist (true/false); cannot be used with --delete
     -d, --delete    Delete lines matching the search pattern (requires --search; cannot be used with --insert)
+    -v, --debug     Enable verbose debug output
 
 Exit codes:
   0  Success
@@ -27,50 +28,91 @@ import fnmatch
 import os
 import sys
 
+try:
+    from os4690 import mappath
+    issky = True
+except ImportError:
+    issky = False
 
+_debug = False
+
+def std_out(level, message):
+    """Central output manager. Levels: 'info', 'debug', 'error'."""
+    if level == 'debug':
+        if _debug:
+            print(f"[DEBUG] {message}")
+    elif level == 'error':
+        print(f"[ERROR] {message}", file=sys.stderr)
+    else:
+        print(message)
+    
 def match_line(pattern, line):
     """Return True if the line matches the wildcard pattern."""
     return fnmatch.fnmatch(line.strip(), pattern)
 
 
+def detect_eol(file_path):
+    """Return the EOL sequence used in the file ('\r\n' or '\n').
+    Reads raw bytes so EOL is never translated by Python's text mode."""
+    try:
+        with open(file_path, 'rb') as f:
+            raw = f.read(4096)
+        if b'\r\n' in raw:
+            return '\r\n'
+    except OSError:
+        pass
+    return '\n'
+
+
 def process_file(file_path, search_pattern, insert_value, create, delete):
+    std_out('debug', f"Processing file path: {file_path}")
+    std_out('debug', f"Mode: delete={delete}, create={create}, has_search={search_pattern is not None}")
+
     if not os.path.exists(file_path):
+        std_out('debug', "Target file does not exist.")
         if delete:
-            print(f"Error: target file not found: {file_path}", file=sys.stderr)
+            std_out('error', f"target file not found: {file_path}")
             sys.exit(1)
         if create:
             try:
+                std_out('debug', "Create flag is true. Creating missing target file.")
                 open(file_path, 'w').close()
-                print(f"Created file: {file_path}")
+                std_out('info', f"Created file: {file_path}")
             except OSError as e:
-                print(f"Error: could not create file '{file_path}': {e}", file=sys.stderr)
+                std_out('error', f"could not create file '{file_path}': {e}")
                 sys.exit(2)
         else:
-            print(f"Error: target file not found: {file_path}", file=sys.stderr)
+            std_out('error', f"target file not found: {file_path}")
             sys.exit(1)
 
     try:
-        with open(file_path, 'r') as f:
+        std_out('debug', "Reading target file.")
+        with open(file_path, 'r', newline='') as f:
             lines = f.readlines()
+        eol = detect_eol(file_path)
+        std_out('debug', f"Read {len(lines)} line(s) from file. EOL style: {repr(eol)}")
     except OSError as e:
-        print(f"Error: could not read file '{file_path}': {e}", file=sys.stderr)
+        std_out('error', f"could not read file '{file_path}': {e}")
         sys.exit(3)
 
     # No search pattern — plain append if value not already present
     if search_pattern is None:
+        std_out('debug', "No search pattern provided; insert-only mode.")
         if insert_value is not None:
             existing = [l.strip() for l in lines]
             if insert_value in existing:
-                print(f"Value already exists in file: {insert_value}")
+                std_out('info', f"Value already exists in file: {insert_value}")
+                std_out('debug', "Insert value already present. No file changes made.")
             else:
                 try:
-                    with open(file_path, 'a') as f:
-                        if lines and not lines[-1].endswith('\n'):
-                            f.write('\n')
-                        f.write(insert_value + '\n')
-                    print(f"Inserted: {insert_value}")
+                    std_out('debug', "Appending insert value to end of file.")
+                    with open(file_path, 'a', newline='') as f:
+                        if lines and not lines[-1].endswith(('\n', '\r\n')):
+                            f.write(eol)
+                        f.write(insert_value + eol)
+                    std_out('info', f"Inserted: {insert_value}")
                 except OSError as e:
-                    print(f"Error: could not write to file '{file_path}': {e}", file=sys.stderr)
+                    std_out('error', f"could not write to file '{file_path}': {e}")
                     sys.exit(4)
         return
 
@@ -90,46 +132,51 @@ def process_file(file_path, search_pattern, insert_value, create, delete):
                 # Skip line (effectively deletes it)
                 continue
             elif insert_value is not None:
-                new_lines.append(insert_value + '\n')
+                new_lines.append(insert_value + eol)
                 continue
         new_lines.append(line)
 
+    std_out('debug', f"Matched {matched_count} line(s); exact-match skips: {already_exact}.")
+
     if already_exact and matched_count == 0:
-        print(f"Value already exists in file: {insert_value}")
+        std_out('info', f"Value already exists in file: {insert_value}")
         return
 
     if delete and matched_count == 0:
-        print(f"No matches found for '{search_pattern}'. Nothing deleted.")
+        std_out('info', f"No matches found for '{search_pattern}'. Nothing deleted.")
+        std_out('debug', "Delete requested but no matches found. No file changes made.")
         return
 
     if matched_count == 0 and not delete:
         if insert_value is not None:
             # No match found — insert the value as a new line
-            if new_lines and not new_lines[-1].endswith('\n'):
-                new_lines.append('\n')
-            new_lines.append(insert_value + '\n')
-            print(f"No match found for '{search_pattern}'. Inserted: {insert_value}")
+            if new_lines and not new_lines[-1].endswith(('\n', '\r\n')):
+                new_lines.append(eol)
+            new_lines.append(insert_value + eol)
+            std_out('info', f"No match found for '{search_pattern}'. Inserted: {insert_value}")
         else:
-            print(f"No match found for '{search_pattern}'. Nothing changed.")
+            std_out('info', f"No match found for '{search_pattern}'. Nothing changed.")
         try:
-            with open(file_path, 'w') as f:
+            std_out('debug', "Writing updated content after no-match insert behavior.")
+            with open(file_path, 'w', newline='') as f:
                 f.writelines(new_lines)
         except OSError as e:
-            print(f"Error: could not write to file '{file_path}': {e}", file=sys.stderr)
+            std_out('error', f"could not write to file '{file_path}': {e}")
             sys.exit(4)
         return
 
     try:
-        with open(file_path, 'w') as f:
+        std_out('debug', "Writing updated content after replace/delete operation.")
+        with open(file_path, 'w', newline='') as f:
             f.writelines(new_lines)
     except OSError as e:
-        print(f"Error: could not write to file '{file_path}': {e}", file=sys.stderr)
+        std_out('error', f"could not write to file '{file_path}': {e}")
         sys.exit(4)
 
     if delete:
-        print(f"Deleted {matched_count} line(s) matching '{search_pattern}'.")
+        std_out('info', f"Deleted {matched_count} line(s) matching '{search_pattern}'.")
     else:
-        print(f"Replaced {matched_count} line(s) matching '{search_pattern}' with: {insert_value}")
+        std_out('info', f"Replaced {matched_count} line(s) matching '{search_pattern}' with: {insert_value}")
 
 
 def main():
@@ -167,6 +214,12 @@ def main():
         action="store_true",
         help="Delete lines matching the search pattern instead of replacing them",
     )
+    parser.add_argument(
+        "-v",
+        "--debug",
+        action="store_true",
+        help="Enable verbose debug output",
+    )
 
     args = parser.parse_args()
 
@@ -179,7 +232,18 @@ def main():
     if args.search is not None and args.insert is None and not args.delete:
         parser.error("--search requires either --insert or --delete.")
 
-    process_file(args.file, args.search, args.insert, args.create, args.delete)
+    global _debug
+    _debug = args.debug
+    std_out('debug', f"Sky runtime detected: {issky}")
+    if issky:
+        std_out('debug', f"Mapping Sky path with os4690.mappath: {args.file}")
+        filePath = mappath(args.file, False)
+        std_out('debug', f"Mapped file path: {filePath}")
+    else:
+        filePath = args.file
+        std_out('debug', f"Using file path without mapping: {filePath}")
+
+    process_file(filePath, args.search, args.insert, args.create, args.delete)
 
 
 if __name__ == "__main__":
