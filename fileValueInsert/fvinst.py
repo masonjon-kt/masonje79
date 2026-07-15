@@ -3,16 +3,17 @@
 fvinst.py - File Value Insert/Replace/Delete utility
 
 Usage:
-  fvinst.py --file <file> --insert <value>                  # append value
-  fvinst.py --file <file> --search <pattern> --insert <value>  # replace match
-  fvinst.py --file <file> --search <pattern> --delete           # delete match
+    fvinst.py -f <file> -i <value>                           # append value if not present
+    fvinst.py -f <file> -s <pattern> -i <value>              # replace matching line(s)
+    fvinst.py -f <file> -s <pattern> -d                       # delete matching line(s)
+    fvinst.py -f <file> -i <value> -c true                    # create file then insert
 
 Options:
-  --file      Target file path (required)
-  --insert    Value to insert into the file
-  --search    Search pattern (supports wildcards: *, ?, [seq]); required with --delete
-  --create    Create the file if it does not exist (true/false)
-  --delete    Delete lines matching the search pattern (requires --search)
+    -f, --file      Target file path (required)
+    -i, --insert    Value to insert into the file
+    -s, --search    Search pattern (supports wildcards: *, ?, [seq]); required with --delete
+    -c, --create    Create the file if it does not exist (true/false); cannot be used with --delete
+    -d, --delete    Delete lines matching the search pattern (requires --search; cannot be used with --insert)
 
 Exit codes:
   0  Success
