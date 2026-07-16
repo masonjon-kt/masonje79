@@ -42,7 +42,10 @@ def std_out(level, message):
         if _debug:
             print(f"[DEBUG] {message}")
     elif level == 'error':
-        print(f"[ERROR] {message}", file=sys.stderr)
+        if issky:
+            print(f"[ERROR] {message}") # Sky environment may not support sys.stderr
+        else:
+            print(f"[ERROR] {message}", file=sys.stderr)
     else:
         print(message)
     
@@ -180,6 +183,11 @@ def process_file(file_path, search_pattern, insert_value, create, delete):
 
 
 def main():
+    def parser_error(message):
+        std_out('error', message)
+        std_out('error', "Exiting with usage information.")
+        parser.error(message)
+
     parser = argparse.ArgumentParser(
         description="Insert, replace, or delete lines in a file using wildcard search patterns.",
         epilog=(
@@ -224,13 +232,13 @@ def main():
     args = parser.parse_args()
 
     if args.delete and args.insert is not None:
-        parser.error("--delete cannot be used together with --insert.")
+        parser_error("--delete cannot be used together with --insert.")
     if args.delete and args.create:
-        parser.error("--delete cannot be used together with --create.")
+        parser_error("--delete cannot be used together with --create.")
     if args.delete and args.search is None:
-        parser.error("--delete requires --search.")
+        parser_error("--delete requires --search.")
     if args.search is not None and args.insert is None and not args.delete:
-        parser.error("--search requires either --insert or --delete.")
+        parser_error("--search requires either --insert or --delete.")
 
     global _debug
     _debug = args.debug
@@ -243,8 +251,10 @@ def main():
         filePath = args.file
         std_out('debug', f"Using file path without mapping: {filePath}")
 
+    std_out('info', f"Target file: {filePath}")
     process_file(filePath, args.search, args.insert, args.create, args.delete)
-
+    std_out('info', "Operation completed successfully.")
 
 if __name__ == "__main__":
     main()
+    quit(0)
