@@ -5,6 +5,7 @@ fvinst.py - File Value Insert/Replace/Delete utility
 Usage:
     fvinst.py -f <file> -i <value>                           # append value if not present
     fvinst.py -f <file> -s <pattern> -i <value>              # replace matching line(s)
+    fvinst.py -f <file> -s <pattern> -i <value> -se          # replace only if matched; do not append on no match
     fvinst.py -f <file> -s <pattern> -d                       # delete matching line(s)
     fvinst.py -f <file> -i <value> -c true                    # create file then insert
 
@@ -14,6 +15,8 @@ Options:
     -s, --search    Search pattern (supports wildcards: *, ?, [seq]); required with --delete
     -c, --create    Create the file if it does not exist (true/false); cannot be used with --delete
     -d, --delete    Delete lines matching the search pattern (requires --search; cannot be used with --insert)
+    -se, --search-exclusive
+                    With --search and --insert, only replace on match; do not append when no match is found
     -v, --debug     Enable verbose debug output
 
 Exit codes:
@@ -67,9 +70,9 @@ def detect_eol(file_path):
     return '\n'
 
 
-def process_file(file_path, search_pattern, insert_value, create, delete):
+def process_file(file_path, search_pattern, insert_value, create, delete, search_exclusive):
     std_out('debug', f"Processing file path: {file_path}")
-    std_out('debug', f"Mode: delete={delete}, create={create}, has_search={search_pattern is not None}")
+    std_out('debug', f"Mode: delete={delete}, create={create}, has_search={search_pattern is not None}, search_exclusive={search_exclusive}")
 
     if not os.path.exists(file_path):
         std_out('debug', "Target file does not exist.")
@@ -86,6 +89,7 @@ def process_file(file_path, search_pattern, insert_value, create, delete):
                 sys.exit(2)
         else:
             std_out('error', f"target file not found: {file_path}")
+            std_out('info', f"Set --create true to create the file if it does not exist.")
             sys.exit(1)
 
     try:
@@ -152,6 +156,10 @@ def process_file(file_path, search_pattern, insert_value, create, delete):
 
     if matched_count == 0 and not delete:
         if insert_value is not None:
+            if search_exclusive:
+                std_out('info', f"No match found for '{search_pattern}'. Search-exclusive mode: file left unchanged.")
+                std_out('debug', "Search-exclusive mode enabled and no matches found. No file changes made.")
+                return
             # No match found — insert the value as a new line
             if new_lines and not new_lines[-1].endswith(('\n', '\r\n')):
                 new_lines.append(eol)
@@ -223,6 +231,12 @@ def main():
         help="Delete lines matching the search pattern instead of replacing them",
     )
     parser.add_argument(
+        "-se",
+        "--search-exclusive",
+        action="store_true",
+        help="With --search and --insert, only replace on match; do not append when no match is found",
+    )
+    parser.add_argument(
         "-v",
         "--debug",
         action="store_true",
@@ -239,6 +253,10 @@ def main():
         parser_error("--delete requires --search.")
     if args.search is not None and args.insert is None and not args.delete:
         parser_error("--search requires either --insert or --delete.")
+    if args.search_exclusive and (args.search is None or args.insert is None):
+        parser_error("--search-exclusive requires both --search and --insert.")
+    if args.search_exclusive and args.delete:
+        parser_error("--search-exclusive cannot be used together with --delete.")
 
     global _debug
     _debug = args.debug
@@ -252,7 +270,7 @@ def main():
         std_out('debug', f"Using file path without mapping: {filePath}")
 
     std_out('info', f"Target file: {filePath}")
-    process_file(filePath, args.search, args.insert, args.create, args.delete)
+    process_file(filePath, args.search, args.insert, args.create, args.delete, args.search_exclusive)
     std_out('info', "Operation completed successfully.")
 
 if __name__ == "__main__":
