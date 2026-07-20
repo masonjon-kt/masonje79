@@ -6,6 +6,7 @@ Usage:
     fvinst.py -f <file> -i <value>                           # append value if not present
     fvinst.py -f <file> -s <pattern> -i <value>              # replace matching line(s)
     fvinst.py -f <file> -s <pattern> -i <value> -se          # replace only if matched; do not append on no match
+    fvinst.py -f <file> -s <pattern> -so                     # search only (exit 0 if found, -1 if not found)
     fvinst.py -f <file> -s <pattern> -d                       # delete matching line(s)
     fvinst.py -f <file> -i <value> -c true                    # create file then insert
 
@@ -17,6 +18,8 @@ Options:
     -d, --delete    Delete lines matching the search pattern (requires --search; cannot be used with --insert)
     -se, --search-exclusive
                     With --search and --insert, only replace on match; do not append when no match is found
+    -so, --search-only
+                    Search for pattern only; makes no file changes, exits 0 if found else -1
     -v, --debug     Enable verbose debug output
 
 Exit codes:
@@ -190,6 +193,29 @@ def process_file(file_path, search_pattern, insert_value, create, delete, search
         std_out('info', f"Replaced {matched_count} line(s) matching '{search_pattern}' with: {insert_value}")
 
 
+def search_only(file_path, search_pattern):
+    std_out('debug', f"Search-only mode. file={file_path}, pattern={search_pattern}")
+
+    if not os.path.exists(file_path):
+        std_out('info', f"Pattern not found (file missing): {search_pattern}")
+        sys.exit(-1)
+
+    try:
+        with open(file_path, 'r', newline='') as f:
+            lines = f.readlines()
+    except OSError as e:
+        std_out('error', f"could not read file '{file_path}': {e}")
+        sys.exit(3)
+
+    found = any(match_line(search_pattern, line) for line in lines)
+    if found:
+        std_out('info', f"Pattern found: {search_pattern}")
+        sys.exit(0)
+
+    std_out('info', f"Pattern not found: {search_pattern}")
+    sys.exit(-1)
+
+
 def main():
     def parser_error(message):
         std_out('error', message)
@@ -237,6 +263,12 @@ def main():
         help="With --search and --insert, only replace on match; do not append when no match is found",
     )
     parser.add_argument(
+        "-so",
+        "--search-only",
+        action="store_true",
+        help="Search for pattern only; make no file changes, exit 0 if found else -1",
+    )
+    parser.add_argument(
         "-v",
         "--debug",
         action="store_true",
@@ -251,12 +283,20 @@ def main():
         parser_error("--delete cannot be used together with --create.")
     if args.delete and args.search is None:
         parser_error("--delete requires --search.")
-    if args.search is not None and args.insert is None and not args.delete:
+    if args.search is not None and args.insert is None and not args.delete and not args.search_only:
         parser_error("--search requires either --insert or --delete.")
     if args.search_exclusive and (args.search is None or args.insert is None):
         parser_error("--search-exclusive requires both --search and --insert.")
     if args.search_exclusive and args.delete:
         parser_error("--search-exclusive cannot be used together with --delete.")
+    if args.search_only and args.search is None:
+        parser_error("--search-only requires --search.")
+    if args.search_only and args.insert is not None:
+        parser_error("--search-only cannot be used together with --insert.")
+    if args.search_only and args.delete:
+        parser_error("--search-only cannot be used together with --delete.")
+    if args.search_only and args.create:
+        parser_error("--search-only cannot be used together with --create.")
 
     global _debug
     _debug = args.debug
@@ -270,6 +310,9 @@ def main():
         std_out('debug', f"Using file path without mapping: {filePath}")
 
     std_out('info', f"Target file: {filePath}")
+    if args.search_only:
+        search_only(filePath, args.search)
+
     process_file(filePath, args.search, args.insert, args.create, args.delete, args.search_exclusive)
     std_out('info', "Operation completed successfully.")
 
