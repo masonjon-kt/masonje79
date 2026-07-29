@@ -14,6 +14,7 @@ Options:
     -f, --file      Target file path (required)
     -i, --insert    Value to insert into the file
     -s, --search    Search pattern (supports wildcards: *, ?, [seq]); required with --delete
+                    To match a literal wildcard character, wrap it in brackets: [*], [?], [[]
     -c, --create    Create the file if it does not exist (true/false); cannot be used with --delete
     -d, --delete    Delete lines matching the search pattern (requires --search; cannot be used with --insert)
     -se, --search-exclusive
@@ -207,9 +208,11 @@ def search_only(file_path, search_pattern):
         std_out('error', f"could not read file '{file_path}': {e}")
         sys.exit(3)
 
-    found = any(match_line(search_pattern, line) for line in lines)
-    if found:
+    matched_lines = [line.rstrip('\r\n') for line in lines if match_line(search_pattern, line)]
+    if matched_lines:
         std_out('info', f"Pattern found: {search_pattern}")
+        for matched_line in matched_lines:
+            std_out('info', matched_line)
         sys.exit(0)
 
     std_out('info', f"Pattern not found: {search_pattern}")
@@ -235,7 +238,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("-f", "--file", required=True, help="Target file path")
-    parser.add_argument("-s", "--search", default=None, help="Search pattern (supports wildcards: *, ?, [seq]). Required with --delete.")
+    parser.add_argument("-s", "--search", default=None, help="Search pattern (supports wildcards: *, ?, [seq]). To match a literal wildcard character, wrap it in brackets: [*], [?], [[]. Required with --delete.")
     parser.add_argument(
         "-i",
         "--insert",
