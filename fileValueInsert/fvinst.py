@@ -58,7 +58,7 @@ def std_out(level, message):
     
 def match_line(pattern, line):
     """Return True if the line matches the wildcard pattern."""
-    return fnmatch.fnmatch(line.strip(), pattern)
+    return fnmatch.fnmatch(line.rstrip('\r\n'), pattern)
 
 
 def detect_eol(file_path):
