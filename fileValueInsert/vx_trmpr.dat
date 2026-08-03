@@ -1,6 +1,0 @@
-elo.fw.workaround=0 
-embedded.use.4690.rs485=1
-enable.touch.calibration.fujitsu.d75=true 
-daemon.usbmon.autostart=0
-
-flash.adxusbuf.dat.4690=1

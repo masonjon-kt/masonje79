@@ -45,4 +45,4 @@ if __name__ == "__main__":
     results = print_results(records)
     print(f"Returned {len(results)} records")
     for x in results:
-        print(f"{x['terminal']}, {x['mac_address']}")
+        print(f"Terminal: {x['terminal']}, MAC Address: {x['mac_address']}")
