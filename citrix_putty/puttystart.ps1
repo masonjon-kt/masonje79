@@ -5,28 +5,20 @@ param(
     [string]$Port = "22"
 )
 
-# Prompt for username with default value
-$Username = Read-Host "Enter username [default: 4690]"
-if (-not $Username) {
-    $Username = "4690"
-}
-
-# Prompt for password once (masked) with reprompt on empty input
-do {
-    $SecurePassword = Read-Host "Enter password" -AsSecureString
-    if ($SecurePassword.Length -eq 0) {
-        Write-Host "Password cannot be empty. Please try again." -ForegroundColor Yellow
-    }
-} while ($SecurePassword.Length -eq 0)
-
-$Password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-    [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($SecurePassword)
-)
-
-# Validate initial inputs
-if (-not $Username -or -not $Password) {
-    Write-Error "Username and password are required."
-    exit 1
+# Helper: prompt for credentials and return them
+function Request-Credentials {
+    $u = Read-Host "Enter username [default: 4690]"
+    if (-not $u) { $u = "4690" }
+    do {
+        $sp = Read-Host "Enter password" -AsSecureString
+        if ($sp.Length -eq 0) {
+            Write-Host "Password cannot be empty. Please try again." -ForegroundColor Yellow
+        }
+    } while ($sp.Length -eq 0)
+    $p = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+        [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($sp)
+    )
+    return @{ Username = $u; Password = $p; SecurePassword = $sp }
 }
 
 # Check if PuTTY is installed
@@ -35,8 +27,7 @@ if (-not (Test-Path $puttyPath)) {
     $puttyPath = "C:\Program Files (x86)\PuTTY\putty.exe"
 }
 if (-not (Test-Path $puttyPath)) {
-    Write-Error "PuTTY not found. Please install PuTTY or update the path in this script."
-    exit 1
+    Write-Host "PuTTY not found. PuTTY will not be available as a terminal option." -ForegroundColor Yellow
 }
 
 # Check if FileZilla is installed
@@ -51,88 +42,180 @@ if (-not (Test-Path $winscpPath)) {
     $winscpPath = "C:\Program Files (x86)\WinSCP\WinSCP.exe"
 }
 
+# Check if TinyTerm is installed
+$tinytermPath = "C:\Program Files\Century\TinyTERM\tt.exe"
+if (-not (Test-Path $tinytermPath)) {
+    $tinytermPath = "C:\Program Files (x86)\Century\TinyTERM\tt.exe"
+}
+
 $SftpPort = "22"
 $lastEnvironment = "mc"
 $lastStore = ""
 
+# Config file in same directory as this script
+$configPath = Join-Path $PSScriptRoot "puttystart.cfg"
+
+# Helper: save all settings to config file
+function Save-Config {
+    param($termChoice, $ftChoice, $username, $securePassword, $lastStore = "", $lastEnvironment = "mc")
+    $encryptedPw = $securePassword | ConvertFrom-SecureString
+    $today = (Get-Date).ToString("yyyy-MM-dd")
+    @"
+TermChoice=$termChoice
+FtChoice=$ftChoice
+Username=$username
+PasswordEncrypted=$encryptedPw
+PasswordDate=$today
+LastStore=$lastStore
+LastEnvironment=$lastEnvironment
+"@ | Set-Content $configPath
+}
+
+# Load saved config
+$savedTermChoice = "1"
+$savedFtChoice = "0"
+$Username = "4690"
+$Password = $null
+$SecurePassword = $null
+$today = (Get-Date).ToString("yyyy-MM-dd")
+
+if (Test-Path $configPath) {
+    $cfg = Get-Content $configPath | ConvertFrom-StringData
+    if ($cfg.TermChoice)          { $savedTermChoice  = $cfg.TermChoice }
+    if ($cfg.FtChoice)            { $savedFtChoice    = $cfg.FtChoice }
+    if ($cfg.Username)            { $Username         = $cfg.Username }
+    if ($cfg.LastStore)           { $lastStore        = $cfg.LastStore }
+    if ($cfg.LastEnvironment)     { $lastEnvironment  = $cfg.LastEnvironment }
+    if ($cfg.PasswordEncrypted -and $cfg.PasswordDate -eq $today) {
+        # Same day — decrypt and reuse stored password
+        try {
+            $SecurePassword = $cfg.PasswordEncrypted | ConvertTo-SecureString
+            $Password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($SecurePassword)
+            )
+            Write-Host "Using saved credentials for $Username (saved today)." -ForegroundColor Green
+        } catch {
+            Write-Host "Could not decrypt saved password. Please re-enter credentials." -ForegroundColor Yellow
+        }
+    } elseif ($cfg.PasswordDate -and $cfg.PasswordDate -ne $today) {
+        Write-Host "Saved password is from $($cfg.PasswordDate). Please enter today's password." -ForegroundColor Yellow
+    }
+}
+
+# Prompt for credentials if not loaded from config
+if (-not $Password) {
+    $creds = Request-Credentials
+    $Username      = $creds.Username
+    $Password      = $creds.Password
+    $SecurePassword = $creds.SecurePassword
+}
+
 # Tool selection loop
+$firstRun = $true
 while ($true) {
-    # Prompt for which tools to use
-    Write-Host "`nWhich tool(s) do you want to use for each connection?" -ForegroundColor Cyan
-    Write-Host "1. PuTTY only (SSH terminal)" -ForegroundColor White
-    Write-Host "2. FileZilla only (SFTP file transfer)" -ForegroundColor White
-    Write-Host "3. Both PuTTY and FileZilla" -ForegroundColor White
-    Write-Host "4. WinSCP only (SFTP file transfer - single window)" -ForegroundColor White
-    Write-Host "5. Both PuTTY and WinSCP" -ForegroundColor White
+    # On first run, use saved preferences and skip the menu
+    if ($firstRun) {
+        $termChoice = $savedTermChoice
+        $ftChoice   = $savedFtChoice
+        $firstRun   = $false
+    } else {
+        # --- Terminal selection ---
+        Write-Host "`nTerminal session:" -ForegroundColor Cyan
+        Write-Host "0. None" -ForegroundColor White
+        Write-Host "1. PuTTY" -ForegroundColor White
+        Write-Host "2. TinyTerm" -ForegroundColor White
 
-    $toolChoice = Read-Host "Enter choice (1-5) [default: 1]"
-    if (-not $toolChoice) {
-        $toolChoice = "1"
+        $termChoice = Read-Host "Select terminal (0-2) [default: $savedTermChoice]"
+        if (-not $termChoice) { $termChoice = $savedTermChoice }
+
+        # --- File transfer selection ---
+        Write-Host "`nFile transfer session:" -ForegroundColor Cyan
+        Write-Host "0. None" -ForegroundColor White
+        Write-Host "1. FileZilla" -ForegroundColor White
+        Write-Host "2. WinSCP" -ForegroundColor White
+
+        $ftChoice = Read-Host "Select file transfer (0-2) [default: $savedFtChoice]"
+        if (-not $ftChoice) { $ftChoice = $savedFtChoice }
+
+        $savedTermChoice = $termChoice
+        $savedFtChoice   = $ftChoice
+        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword
     }
 
-    $usePutty = $false
-    $useFilezilla = $false
-    $useWinSCP = $false
+    # Apply tool flags from chosen values
+    $usePutty    = ($termChoice -eq "1")
+    $useTinyTerm = ($termChoice -eq "2")
+    $useFilezilla = ($ftChoice -eq "1")
+    $useWinSCP    = ($ftChoice -eq "2")
 
-    switch ($toolChoice) {
-        "1" { $usePutty = $true }
-        "2" { $useFilezilla = $true }
-        "3" { $usePutty = $true; $useFilezilla = $true }
-        "4" { $useWinSCP = $true }
-        "5" { $usePutty = $true; $useWinSCP = $true }
-        default { $usePutty = $true }
+    if ($usePutty -and -not (Test-Path $puttyPath)) {
+        Write-Host "PuTTY not found. Terminal will not be launched." -ForegroundColor Yellow
+        $usePutty = $false
     }
-
+    if ($useTinyTerm -and -not (Test-Path $tinytermPath)) {
+        Write-Host "TinyTerm not found at expected locations. Terminal will not be launched." -ForegroundColor Yellow
+        $useTinyTerm = $false
+    }
     if ($useFilezilla -and -not (Test-Path $filezillaPath)) {
-        Write-Host "FileZilla not found at expected locations." -ForegroundColor Yellow
-        Write-Host "FileZilla will not be launched." -ForegroundColor Yellow
+        Write-Host "FileZilla not found at expected locations. File transfer will not be launched." -ForegroundColor Yellow
         $useFilezilla = $false
     }
-
     if ($useWinSCP -and -not (Test-Path $winscpPath)) {
-        Write-Host "WinSCP not found at expected locations." -ForegroundColor Yellow
+        Write-Host "WinSCP not found at expected locations. File transfer will not be launched." -ForegroundColor Yellow
         Write-Host "WinSCP can be downloaded from https://winscp.net" -ForegroundColor Yellow
         $useWinSCP = $false
     }
 
+    Write-Host "`nActive: Terminal=$(if($usePutty){'PuTTY'}elseif($useTinyTerm){'TinyTerm'}else{'None'})  FileTransfer=$(if($useFilezilla){'FileZilla'}elseif($useWinSCP){'WinSCP'}else{'None'})" -ForegroundColor DarkCyan
+
 # Main connection loop
 while ($true) {
     Write-Host "`n--- New Connection ---" -ForegroundColor Cyan
-    
-    # Prompt for endpoint with default value (uses last entered endpoint)
-    $Environment = Read-Host "Enter endpoint (mc, cc, fc, etc.) [default: $lastEnvironment] or 't' to change tools"
-    if (-not $Environment) {
-        $Environment = $lastEnvironment
-    }
-    
-    # Check if user wants to return to tool selection menu
-    if ($Environment -eq "t") {
-        break
-    }
-    
-    $lastEnvironment = $Environment
-    
-    # Prompt for store with reprompt on empty input (uses last entered store as default)
+    Write-Host "  Endpoint: $lastEnvironment  |  't' = change tools  |  'c' = change credentials  |  'e' = change endpoint" -ForegroundColor DarkGray
+
+    # Prompt for store (accepts special commands)
     $storePrompt = "Enter store number (e.g., ci123)"
-    if ($lastStore) {
-        $storePrompt += " [default: $lastStore]"
+    if ($lastStore) { $storePrompt += " [default: $lastStore]" }
+
+    $storeInput = Read-Host $storePrompt
+
+    if ($storeInput -eq "t") { break }
+    if ($storeInput -eq "c") {
+        $creds = Request-Credentials
+        $Username       = $creds.Username
+        $Password       = $creds.Password
+        $SecurePassword = $creds.SecurePassword
+        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment
+        Write-Host "Credentials updated." -ForegroundColor Green
+        continue
     }
-    
-    do {
-        $Store = Read-Host $storePrompt
-        if (-not $Store) {
-            if ($lastStore) {
-                $Store = $lastStore
-            } else {
-                Write-Host "Store number cannot be empty. Please try again." -ForegroundColor Yellow
-            }
+    if ($storeInput -eq "e") {
+        $newEnv = Read-Host "Enter endpoint (mc, cc, fc, etc.) [default: $lastEnvironment]"
+        if ($newEnv) { $lastEnvironment = $newEnv }
+        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment
+        continue
+    }
+
+    $Store = $storeInput
+    if (-not $Store) {
+        if ($lastStore) {
+            $Store = $lastStore
+        } else {
+            Write-Host "Store number cannot be empty. Please try again." -ForegroundColor Yellow
+            continue
         }
-    } while (-not $Store)
+    }
+
+    $lastStore = $Store
+    $Environment = $lastEnvironment
     
     $lastStore = $Store
     
     # Construct target host
     $TargetHost = "$Environment.$Store.kroger.com"
+    
+    # Save last store and endpoint to config
+    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment
     
     Write-Host "Connecting to: $TargetHost as $Username" -ForegroundColor Green
     
@@ -144,6 +227,12 @@ while ($true) {
     if ($usePutty) {
         Write-Host "Launching PuTTY..." -ForegroundColor Cyan
         & $puttyPath -l $Username -P $Port $TargetHost
+    }
+
+    # Launch TinyTerm if selected
+    if ($useTinyTerm) {
+        Write-Host "Launching TinyTerm..." -ForegroundColor Cyan
+        & $tinytermPath "ssh://$Username`:$Password@${TargetHost}:$Port"
     }
     
     # Launch FileZilla if selected
@@ -158,7 +247,7 @@ while ($true) {
         & $winscpPath "sftp://$Username`:$Password@${TargetHost}:$SftpPort"
     }
     
-    if ($usePutty -or $useFilezilla -or $useWinSCP) {
+    if ($usePutty -or $useTinyTerm -or $useFilezilla -or $useWinSCP) {
         Write-Host "Session(s) closed. Ready for next connection." -ForegroundColor Yellow
     }
 }
