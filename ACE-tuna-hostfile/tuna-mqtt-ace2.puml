@@ -1,0 +1,164 @@
+@startuml
+title RCO Replacement - MQTT + REST Process Flow
+
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor #F8F8F8
+  BorderColor #444444
+  FontName Arial
+}
+skinparam partition {
+  BackgroundColor #FFFFFF
+  BorderColor #666666
+}
+skinparam note {
+  BackgroundColor #FFF7D6
+  BorderColor #C8A600
+}
+
+|TUNA bash caller|
+start
+:Call one of netrco.func operations:
+cp_to_pos,
+cp_from_pos,
+run_on_pos,
+delete_from_pos;
+
+if (/ha/ignore.isp exists?) then (yes)
+  :Use MQTT path;
+elseif (ISP hostname exists in /etc/hosts?) then (yes)
+  :Use legacy qftp / cmd_on_isp path;
+  :Caller sees legacy behavior;
+  stop
+else (ISP gone)
+  :Use MQTT path;
+endif
+
+:Invoke mqtt_rco CLI;
+:Parse args and build command JSON;
+note right
+Common command envelope:
+- op
+- correlation_id
+- response_topic
+- issued_at
+- qftp_equivalent
+
+Operation-specific fields are added
+for file copy, command execution,
+or delete behavior.
+end note
+
+:Connect to /var/run/mqtt_rcod.sock;
+
+|TUNA mqtt_rcod daemon|
+:Accept CLI IPC connection;
+
+note right
+Daemon is long-lived per TUNA VM.
+It maintains MQTT connection to int:1883,
+uses MQTT v3.1.1, clean_session=true,
+keep_alive=60s, and publishes
+connection status messages.
+end note
+
+if (Daemon is VIP owner?) then (no)
+  :Return "not-active" error over IPC;
+  |TUNA bash caller|
+  :Exit non-zero;
+  stop
+else (yes)
+  :Subscribe to per-request response_topic;
+  :Add request to in-flight table
+keyed by correlation_id;
+endif
+
+repeat
+  :Publish command to
+store/rco/cmd/<div>/<store>
+using MQTT QoS 0;
+
+  |POS MQTT subscriber|
+  :Receive command from store command topic;
+
+  if (correlation_id in dedup cache?) then (yes)
+    :Do not re-execute operation;
+    :Re-publish cached response
+to response_topic;
+  else (no)
+    :Dispatch by op;
+
+    if (op == cp_to_pos?) then (yes)
+      :HTTPS GET TUNA REST endpoint
+/cp_to_pos?tuna_fn=...&xlate=yes|no;
+      :Receive file bytes or [ERR:...];
+      :Write bytes to pos_file;
+      note right
+      Honor:
+      - ADXLXACN:: compound target prefix
+      - -Fxx mirror / compound flags
+      - -x translation option
+      end note
+
+    elseif (op == cp_from_pos?) then (yes)
+      :Read pos_file bytes;
+      :HTTPS POST raw file bytes to
+/cp_from_pos?tuna_fn=...&xlate=yes|no;
+      :Receive empty/OK or [ERR:...];
+
+    elseif (op == run_on_pos?) then (yes)
+      :Execute cmd + args locally
+in POS environment;
+      :Honor > and >> redirection;
+      :Do not return stdout
+in MQTT response;
+
+    elseif (op == delete_from_pos?) then (yes)
+      :Delete pos_file;
+      :Match legacy qftp -d behavior
+for edge cases;
+
+    else (unknown op)
+      :Set failure response;
+    endif
+
+    :Build response JSON:
+correlation_id,
+rc,
+message,
+elapsed_ms;
+
+    :Publish response to response_topic
+using MQTT QoS 0;
+
+    :Cache response by correlation_id
+for dedup window;
+  endif
+
+  |TUNA mqtt_rcod daemon|
+repeat while (No matching response within timeout\nand attempts remain?) is (retry same JSON)
+
+if (Matching response received?) then (yes)
+  :Remove request from in-flight table;
+  :Unsubscribe from response_topic;
+  :Return response JSON over IPC;
+
+  |TUNA bash caller|
+  if (rc != 0?) then (yes)
+    :Print message to stderr;
+  endif
+  :Exit with rc;
+  stop
+
+else (no response after max attempts)
+  :Remove request from in-flight table;
+  :Unsubscribe from response_topic;
+  :Return timeout failure over IPC;
+
+  |TUNA bash caller|
+  :Write clear "no response after N attempts";
+  :Exit non-zero;
+  stop
+endif
+
+@enduml
