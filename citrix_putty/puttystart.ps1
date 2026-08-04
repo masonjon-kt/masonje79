@@ -1,9 +1,30 @@
 # PuTTY SSH connection to Kroger environments
 # Prompts for endpoint and store, launches PuTTY sessions in a loop
+#
+# Usage:
+#   .\puttystart.ps1 [-Port <port>] [-v]
+#
+# Parameters:
+#   -Port <port>   SSH port to connect on. Default: 22
+#   -v             Verbose mode. Prints the exact command being run before each
+#                  tool launch (password is masked with *****).
+#
+# Runtime commands (entered at the store prompt):
+#   t   Open tool selection menu (change terminal / file transfer app)
+#   c   Open credential management menu (update daily PWD, manage static creds)
+#   e   Change the current endpoint (mc, cc, fc, etc.)
+#
+# Examples:
+#   .\puttystart.ps1                 # Normal run, defaults to port 22
+#   .\puttystart.ps1 -v              # Verbose — shows launch commands
+#   .\puttystart.ps1 -Port 2222      # Connect on a non-standard SSH port
 
 param(
-    [string]$Port = "22"
+    [string]$Port = "22",
+    [switch]$v
 )
+
+$Verbose = $v.IsPresent
 
 # Helper: prompt for credentials and return them
 function Request-Credentials {
@@ -315,25 +336,29 @@ while ($true) {
     # Launch PuTTY if selected
     if ($usePutty) {
         Write-Host "Launching PuTTY..." -ForegroundColor Cyan
+        if ($Verbose) { Write-Host "  CMD: `"$puttyPath`" -l $ConnUsername -P $Port $TargetHost" -ForegroundColor DarkYellow }
         & $puttyPath -l $ConnUsername -P $Port $TargetHost
     }
 
     # Launch TinyTerm if selected
     if ($useTinyTerm) {
         Write-Host "Launching TinyTerm..." -ForegroundColor Cyan
-        & $tinytermPath "ssh://$ConnUsername`:`$ConnPassword@${TargetHost}:$Port"
+        if ($Verbose) { Write-Host "  CMD: `"$tinytermPath`" ssh://$ConnUsername`:*****@${TargetHost}:$Port" -ForegroundColor DarkYellow }
+        & $tinytermPath "ssh://$ConnUsername`:$ConnPassword@${TargetHost}:$Port"
     }
 
     # Launch FileZilla if selected
     if ($useFilezilla) {
         Write-Host "Launching FileZilla..." -ForegroundColor Cyan
-        & $filezillaPath "sftp://$ConnUsername`:`$ConnPassword@${TargetHost}:$SftpPort"
+        if ($Verbose) { Write-Host "  CMD: `"$filezillaPath`" sftp://$ConnUsername`:*****@${TargetHost}:$SftpPort" -ForegroundColor DarkYellow }
+        & $filezillaPath "sftp://$ConnUsername`:$ConnPassword@${TargetHost}:$SftpPort"
     }
 
     # Launch WinSCP if selected
     if ($useWinSCP) {
         Write-Host "Launching WinSCP..." -ForegroundColor Cyan
-        & $winscpPath "sftp://$ConnUsername`:`$ConnPassword@${TargetHost}:$SftpPort"
+        if ($Verbose) { Write-Host "  CMD: `"$winscpPath`" sftp://$ConnUsername`:*****@${TargetHost}:$SftpPort" -ForegroundColor DarkYellow }
+        & $winscpPath "sftp://$ConnUsername`:$ConnPassword@${TargetHost}:$SftpPort"
     }
     
     if ($usePutty -or $useTinyTerm -or $useFilezilla -or $useWinSCP) {
