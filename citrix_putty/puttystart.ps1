@@ -51,24 +51,34 @@ if (-not (Test-Path $tinytermPath)) {
 $SftpPort = "22"
 $lastEnvironment = "mc"
 $lastStore = ""
+$staticCreds = @{}  # key: store (lowercase), value: @{Username; Password; SecurePassword}
 
 # Config file in same directory as this script
 $configPath = Join-Path $PSScriptRoot "puttystart.cfg"
 
 # Helper: save all settings to config file
 function Save-Config {
-    param($termChoice, $ftChoice, $username, $securePassword, $lastStore = "", $lastEnvironment = "mc")
+    param($termChoice, $ftChoice, $username, $securePassword, $lastStore = "", $lastEnvironment = "mc", $staticCredsTable = $null)
     $encryptedPw = $securePassword | ConvertFrom-SecureString
     $today = (Get-Date).ToString("yyyy-MM-dd")
-    @"
-TermChoice=$termChoice
-FtChoice=$ftChoice
-Username=$username
-PasswordEncrypted=$encryptedPw
-PasswordDate=$today
-LastStore=$lastStore
-LastEnvironment=$lastEnvironment
-"@ | Set-Content $configPath
+    $lines = @(
+        "TermChoice=$termChoice",
+        "FtChoice=$ftChoice",
+        "Username=$username",
+        "PwdEncrypted=$encryptedPw",
+        "PwdDate=$today",
+        "LastStore=$lastStore",
+        "LastEnvironment=$lastEnvironment"
+    )
+    if ($staticCredsTable) {
+        foreach ($store in $staticCredsTable.Keys | Sort-Object) {
+            $sc = $staticCredsTable[$store]
+            $encStatic = $sc.SecurePassword | ConvertFrom-SecureString
+            $lines += "Static_${store}_Username=$($sc.Username)"
+            $lines += "Static_${store}_Password=$encStatic"
+        }
+    }
+    $lines -join "`n" | Set-Content $configPath
 }
 
 # Load saved config
@@ -80,16 +90,16 @@ $SecurePassword = $null
 $today = (Get-Date).ToString("yyyy-MM-dd")
 
 if (Test-Path $configPath) {
-    $cfg = Get-Content $configPath | ConvertFrom-StringData
+    $cfg = Get-Content $configPath -Raw | ConvertFrom-StringData
     if ($cfg.TermChoice)          { $savedTermChoice  = $cfg.TermChoice }
     if ($cfg.FtChoice)            { $savedFtChoice    = $cfg.FtChoice }
     if ($cfg.Username)            { $Username         = $cfg.Username }
     if ($cfg.LastStore)           { $lastStore        = $cfg.LastStore }
     if ($cfg.LastEnvironment)     { $lastEnvironment  = $cfg.LastEnvironment }
-    if ($cfg.PasswordEncrypted -and $cfg.PasswordDate -eq $today) {
+    if ($cfg.PwdEncrypted -and $cfg.PwdDate -eq $today) {
         # Same day — decrypt and reuse stored password
         try {
-            $SecurePassword = $cfg.PasswordEncrypted | ConvertTo-SecureString
+            $SecurePassword = $cfg.PwdEncrypted | ConvertTo-SecureString
             $Password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
                 [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($SecurePassword)
             )
@@ -97,8 +107,31 @@ if (Test-Path $configPath) {
         } catch {
             Write-Host "Could not decrypt saved password. Please re-enter credentials." -ForegroundColor Yellow
         }
-    } elseif ($cfg.PasswordDate -and $cfg.PasswordDate -ne $today) {
-        Write-Host "Saved password is from $($cfg.PasswordDate). Please enter today's password." -ForegroundColor Yellow
+    } elseif ($cfg.PwdDate -and $cfg.PwdDate -ne $today) {
+        Write-Host "Saved password is from $($cfg.PasswordDate). Opening password portal..." -ForegroundColor Yellow
+        Set-Location "C:\Program Files (x86)\Microsoft\Edge\Application\"
+        Start-Process "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" "https://possecurity-prod.cdengpos.rch-cdc-cdeprod.kroger.com/#/"
+    }
+
+    # Load static credentials
+    foreach ($key in $cfg.Keys) {
+        if ($key -match '^Static_(.+)_Username$') {
+            $store = $Matches[1].ToLower()
+            if (-not $staticCreds.ContainsKey($store)) { $staticCreds[$store] = @{} }
+            $staticCreds[$store].Username = $cfg[$key]
+        } elseif ($key -match '^Static_(.+)_Password$') {
+            $store = $Matches[1].ToLower()
+            if (-not $staticCreds.ContainsKey($store)) { $staticCreds[$store] = @{} }
+            try {
+                $sp = $cfg[$key] | ConvertTo-SecureString
+                $staticCreds[$store].SecurePassword = $sp
+                $staticCreds[$store].Password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                    [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($sp)
+                )
+            } catch {
+                Write-Host "Could not decrypt static credentials for store '$store'." -ForegroundColor Yellow
+            }
+        }
     }
 }
 
@@ -139,7 +172,7 @@ while ($true) {
 
         $savedTermChoice = $termChoice
         $savedFtChoice   = $ftChoice
-        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword
+        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -staticCredsTable $staticCreds
     }
 
     # Apply tool flags from chosen values
@@ -181,18 +214,66 @@ while ($true) {
 
     if ($storeInput -eq "t") { break }
     if ($storeInput -eq "c") {
-        $creds = Request-Credentials
-        $Username       = $creds.Username
-        $Password       = $creds.Password
-        $SecurePassword = $creds.SecurePassword
-        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment
-        Write-Host "Credentials updated." -ForegroundColor Green
+        Write-Host "`nCredential Management:" -ForegroundColor Cyan
+        Write-Host "1. Update daily password (PWD)" -ForegroundColor White
+        Write-Host "2. Add/update static credentials for a store" -ForegroundColor White
+        Write-Host "3. Remove static credentials for a store" -ForegroundColor White
+        Write-Host "4. List stores with static credentials" -ForegroundColor White
+        Write-Host "5. Cancel" -ForegroundColor White
+        $credAction = Read-Host "Select (1-5)"
+        switch ($credAction) {
+            "1" {
+                $creds = Request-Credentials
+                $Username       = $creds.Username
+                $Password       = $creds.Password
+                $SecurePassword = $creds.SecurePassword
+                Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds
+                Write-Host "Daily credentials updated." -ForegroundColor Green
+            }
+            "2" {
+                $storeKey = (Read-Host "Enter store number to set static credentials for").ToLower()
+                if ($storeKey) {
+                    $staticUser = Read-Host "Enter username for $storeKey [default: $Username]"
+                    if (-not $staticUser) { $staticUser = $Username }
+                    do {
+                        $staticSp = Read-Host "Enter static password for $storeKey" -AsSecureString
+                        if ($staticSp.Length -eq 0) { Write-Host "Password cannot be empty." -ForegroundColor Yellow }
+                    } while ($staticSp.Length -eq 0)
+                    $staticP = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                        [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($staticSp)
+                    )
+                    $staticCreds[$storeKey] = @{ Username = $staticUser; Password = $staticP; SecurePassword = $staticSp }
+                    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds
+                    Write-Host "Static credentials saved for $storeKey." -ForegroundColor Green
+                }
+            }
+            "3" {
+                $storeKey = (Read-Host "Enter store number to remove").ToLower()
+                if ($staticCreds.ContainsKey($storeKey)) {
+                    $staticCreds.Remove($storeKey)
+                    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds
+                    Write-Host "Static credentials removed for $storeKey." -ForegroundColor Green
+                } else {
+                    Write-Host "No static credentials found for '$storeKey'." -ForegroundColor Yellow
+                }
+            }
+            "4" {
+                if ($staticCreds.Count -eq 0) {
+                    Write-Host "No static credentials stored." -ForegroundColor Yellow
+                } else {
+                    Write-Host "Stores with static credentials:" -ForegroundColor Cyan
+                    foreach ($store in ($staticCreds.Keys | Sort-Object)) {
+                        Write-Host "  $store  (user: $($staticCreds[$store].Username))" -ForegroundColor White
+                    }
+                }
+            }
+        }
         continue
     }
     if ($storeInput -eq "e") {
         $newEnv = Read-Host "Enter endpoint (mc, cc, fc, etc.) [default: $lastEnvironment]"
         if ($newEnv) { $lastEnvironment = $newEnv }
-        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment
+        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds
         continue
     }
 
@@ -208,43 +289,51 @@ while ($true) {
 
     $lastStore = $Store
     $Environment = $lastEnvironment
-    
-    $lastStore = $Store
-    
+
     # Construct target host
     $TargetHost = "$Environment.$Store.kroger.com"
-    
+
     # Save last store and endpoint to config
-    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment
-    
-    Write-Host "Connecting to: $TargetHost as $Username" -ForegroundColor Green
-    
+    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds
+
+    # Resolve credentials: static per-store overrides daily PWD
+    $storeKey = $Store.ToLower()
+    if ($staticCreds.ContainsKey($storeKey) -and $staticCreds[$storeKey].Password) {
+        $ConnUsername = $staticCreds[$storeKey].Username
+        $ConnPassword = $staticCreds[$storeKey].Password
+        Write-Host "Connecting to: $TargetHost as $ConnUsername  [STATIC credentials]" -ForegroundColor Green
+    } else {
+        $ConnUsername = $Username
+        $ConnPassword = $Password
+        Write-Host "Connecting to: $TargetHost as $ConnUsername  [PWD credentials]" -ForegroundColor Green
+    }
+
     # Copy password to clipboard
-    $Password | Set-Clipboard
+    $ConnPassword | Set-Clipboard
     Write-Host "Password copied to clipboard." -ForegroundColor Green
-    
+
     # Launch PuTTY if selected
     if ($usePutty) {
         Write-Host "Launching PuTTY..." -ForegroundColor Cyan
-        & $puttyPath -l $Username -P $Port $TargetHost
+        & $puttyPath -l $ConnUsername -P $Port $TargetHost
     }
 
     # Launch TinyTerm if selected
     if ($useTinyTerm) {
         Write-Host "Launching TinyTerm..." -ForegroundColor Cyan
-        & $tinytermPath "ssh://$Username`:$Password@${TargetHost}:$Port"
+        & $tinytermPath "ssh://$ConnUsername`:`$ConnPassword@${TargetHost}:$Port"
     }
-    
+
     # Launch FileZilla if selected
     if ($useFilezilla) {
         Write-Host "Launching FileZilla..." -ForegroundColor Cyan
-        & $filezillaPath "sftp://$Username`:$Password@${TargetHost}:$SftpPort"
+        & $filezillaPath "sftp://$ConnUsername`:`$ConnPassword@${TargetHost}:$SftpPort"
     }
 
     # Launch WinSCP if selected
     if ($useWinSCP) {
         Write-Host "Launching WinSCP..." -ForegroundColor Cyan
-        & $winscpPath "sftp://$Username`:$Password@${TargetHost}:$SftpPort"
+        & $winscpPath "sftp://$ConnUsername`:`$ConnPassword@${TargetHost}:$SftpPort"
     }
     
     if ($usePutty -or $useTinyTerm -or $useFilezilla -or $useWinSCP) {
