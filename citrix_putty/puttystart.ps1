@@ -20,7 +20,7 @@
 #   .\puttystart.ps1 -Port 2222      # Connect on a non-standard SSH port
 
 param(
-    [string]$Port = "22",
+    [string]$Port = $null,
     [switch]$v
 )
 
@@ -69,6 +69,7 @@ if (-not (Test-Path $tinytermPath)) {
     $tinytermPath = "C:\Program Files (x86)\Century\TinyTERM\tt.exe"
 }
 
+if (-not $Port) { $Port = "22" }
 $SftpPort = $Port
 $lastEnvironment = "mc"
 $lastStore = ""
@@ -79,12 +80,13 @@ $configPath = Join-Path $PSScriptRoot "puttystart.cfg"
 
 # Helper: save all settings to config file
 function Save-Config {
-    param($termChoice, $ftChoice, $username, $securePassword, $lastStore = "", $lastEnvironment = "mc", $staticCredsTable = $null)
+    param($termChoice, $ftChoice, $username, $securePassword, $lastStore = "", $lastEnvironment = "mc", $staticCredsTable = $null, $port = "22")
     $encryptedPw = $securePassword | ConvertFrom-SecureString
     $today = (Get-Date).ToString("yyyy-MM-dd")
     $lines = @(
         "TermChoice=$termChoice",
         "FtChoice=$ftChoice",
+        "Port=$port",
         "Username=$username",
         "PwdEncrypted=$encryptedPw",
         "PwdDate=$today",
@@ -117,6 +119,11 @@ if (Test-Path $configPath) {
     if ($cfg.Username)            { $Username         = $cfg.Username }
     if ($cfg.LastStore)           { $lastStore        = $cfg.LastStore }
     if ($cfg.LastEnvironment)     { $lastEnvironment  = $cfg.LastEnvironment }
+    # Command-line -Port takes precedence; fall back to config, then default 22
+    if (-not $Port) {
+        if ($cfg.Port)            { $Port = $cfg.Port }
+        else                      { $Port = "22" }
+    }
     if ($cfg.PwdEncrypted -and $cfg.PwdDate -eq $today) {
         # Same day — decrypt and reuse stored password
         try {
@@ -193,9 +200,14 @@ while ($true) {
         $ftChoice = Read-Host "Select file transfer (0-2) [default: $savedFtChoice]"
         if (-not $ftChoice) { $ftChoice = $savedFtChoice }
 
+        # --- Port configuration ---
+        $newPort = Read-Host "SSH/SFTP port [default: $Port]"
+        if ($newPort) { $Port = $newPort }
+        $SftpPort = $Port
+
         $savedTermChoice = $termChoice
         $savedFtChoice   = $ftChoice
-        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -staticCredsTable $staticCreds
+        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -staticCredsTable $staticCreds -port $Port
     }
 
     # Apply tool flags from chosen values
@@ -222,7 +234,7 @@ while ($true) {
         $useWinSCP = $false
     }
 
-    Write-Host "`nActive: Terminal=$(if($usePutty){'PuTTY'}elseif($useTinyTerm){'TinyTerm'}else{'None'})  FileTransfer=$(if($useFilezilla){'FileZilla'}elseif($useWinSCP){'WinSCP'}else{'None'})" -ForegroundColor DarkCyan
+    Write-Host "`nActive: Terminal=$(if($usePutty){'PuTTY'}elseif($useTinyTerm){'TinyTerm'}else{'None'})  FileTransfer=$(if($useFilezilla){'FileZilla'}elseif($useWinSCP){'WinSCP'}else{'None'})  Port=$Port" -ForegroundColor DarkCyan
 
 # Main connection loop
 while ($true) {
