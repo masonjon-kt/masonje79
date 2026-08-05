@@ -69,7 +69,7 @@ if (-not (Test-Path $tinytermPath)) {
     $tinytermPath = "C:\Program Files (x86)\Century\TinyTERM\tt.exe"
 }
 
-$SftpPort = "22"
+$SftpPort = $Port
 $lastEnvironment = "mc"
 $lastStore = ""
 $staticCreds = @{}  # key: store (lowercase), value: @{Username; Password; SecurePassword}
@@ -158,6 +158,8 @@ if (Test-Path $configPath) {
 
 # Prompt for credentials if not loaded from config
 if (-not $Password) {
+    Write-Host "Opening password portal..." -ForegroundColor Yellow
+    Start-Process "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" "https://possecurity-prod.cdengpos.rch-cdc-cdeprod.kroger.com/#/"
     $creds = Request-Credentials
     $Username      = $creds.Username
     $Password      = $creds.Password
@@ -235,12 +237,13 @@ while ($true) {
 
     if ($storeInput -eq "t") { break }
     if ($storeInput -eq "c") {
+        while ($true) {
         Write-Host "`nCredential Management:" -ForegroundColor Cyan
         Write-Host "1. Update daily password (PWD)" -ForegroundColor White
         Write-Host "2. Add/update static credentials for a store" -ForegroundColor White
         Write-Host "3. Remove static credentials for a store" -ForegroundColor White
         Write-Host "4. List stores with static credentials" -ForegroundColor White
-        Write-Host "5. Cancel" -ForegroundColor White
+        Write-Host "5. Exit" -ForegroundColor White
         $credAction = Read-Host "Select (1-5)"
         switch ($credAction) {
             "1" {
@@ -288,6 +291,9 @@ while ($true) {
                     }
                 }
             }
+            "5" { break }
+        }
+        if ($credAction -eq "5") { break }
         }
         continue
     }
