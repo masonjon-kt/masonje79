@@ -75,18 +75,171 @@ $lastEnvironment = "mc"
 $lastStore = ""
 $staticCreds = @{}  # key: store (lowercase), value: @{Username; Password; SecurePassword}
 
+# Built-in TinyTerm .emu template — written to temp at startup
+$builtInEmuTemplate = @"
+[Application]
+SaveOnExit=0
+
+[Session]
+ProtectSettings=1
+ExtendLinesOnResize=1
+
+[term.emu]
+emulate=13
+colorfg0=8
+colorbg0=1
+scrollback=999
+mode=0
+loginscheme=UNIX Password
+login=0
+user=
+password=
+loginsw=0
+loginW1=
+loginS1=
+loginW2=
+loginS2=
+autoconnect=1
+autocmd=0
+CommLink=1
+Keyboard=1
+lines=25
+col=80
+wrap=1
+monochrome=0
+
+[term.ft]
+protocol=1
+txblksiz=16384
+txwindow=16384
+zmodem32=1
+
+[term.comm]
+node=
+port=22
+commtype=5
+wordlen=8
+stopbits=0
+parity=0
+xon=17
+xoff=19
+sshport=22
+sshcipher=3
+sshCompLevel=9
+sshtype=0
+
+[term.gen]
+editor=notepad.exe
+remark=Generated Template
+
+learnmode=0
+learnfile=0
+errormsg=1
+iconfile=
+iconid=
+macro=0
+sessionbar=0
+menubar=1
+ribbon=0
+splash=0
+altkeys=0
+tooltips=1
+tooltime=1
+protect=0
+language=0
+ddeenable=0
+ddetimeout=
+ddename=
+xwindow=854
+ywindow=207
+wwindows=800
+hwindows=540
+winwmode=0
+servertype=0
+requirelogin=1
+allownewuser=1
+allowxfer=1
+allowchat=1
+banner=banner.txt
+motd=motd.txt
+autoanswer=0
+autobaud=0
+portnum=23
+author=author
+date=date
+subject=subject
+version=version
+email=email
+NewConn=1
+hmtype=0
+RibbonSize=1
+OleStatusBar=0
+OleRibbonBar=1
+OleTapInStg=0
+OleSessionBar=1
+statusbar=1
+SaveType=2
+OleClose=1
+OleShowDlg=1
+errbox=1
+address=1
+scriptfile=
+scptcmd=0
+pstxfrscrpt=
+scptstartup=
+scptconnect=0
+scptlogin=
+scptlogoff=
+scptdiscon=
+scptsesext=
+idxsessrt=0
+idxconnect=0
+idxlogin=0
+idxlogoff=0
+idxdiscon=0
+idxsesext=0
+scptindex=1
+srtsvrlst=
+srtsvridx=0
+stpsvrlst=
+stpsvridx=0
+keymacroind=0
+keymacrolist=KeyMac##.cs
+keymacrofile=
+copyaddcr=0
+keybar=0
+autowindowtitle=
+frameKeyboardFile=
+frameKeyboard=
+
+[term.sys]
+CLASS=term
+LANGUAGE=us
+
+[Fonts]
+FontName1=TermCS1
+FontName2=Term
+
+"@
+
+$builtInEmuPath = Join-Path $env:TEMP "puttystart_template.emu"
+$builtInEmuTemplate | Set-Content -Path $builtInEmuPath -Encoding ASCII
+
+$TinyTermTemplate = $builtInEmuPath  # default; config can override with a custom path
+
 # Config file in same directory as this script
 $configPath = Join-Path $PSScriptRoot "puttystart.cfg"
 
 # Helper: save all settings to config file
 function Save-Config {
-    param($termChoice, $ftChoice, $username, $securePassword, $lastStore = "", $lastEnvironment = "mc", $staticCredsTable = $null, $port = "22")
+    param($termChoice, $ftChoice, $username, $securePassword, $lastStore = "", $lastEnvironment = "mc", $staticCredsTable = $null, $port = "22", $tinyTermTemplate = "")
     $encryptedPw = $securePassword | ConvertFrom-SecureString
     $today = (Get-Date).ToString("yyyy-MM-dd")
     $lines = @(
         "TermChoice=$termChoice",
         "FtChoice=$ftChoice",
         "Port=$port",
+        "TinyTermTemplate=$tinyTermTemplate",
         "Username=$username",
         "PwdEncrypted=$encryptedPw",
         "PwdDate=$today",
@@ -119,6 +272,7 @@ if (Test-Path $configPath) {
     if ($cfg.Username)            { $Username         = $cfg.Username }
     if ($cfg.LastStore)           { $lastStore        = $cfg.LastStore }
     if ($cfg.LastEnvironment)     { $lastEnvironment  = $cfg.LastEnvironment }
+    if ($cfg.TinyTermTemplate)    { $TinyTermTemplate = $cfg.TinyTermTemplate }
     # Command-line -Port takes precedence; fall back to config, then default 22
     if (-not $Port) {
         if ($cfg.Port)            { $Port = $cfg.Port }
@@ -205,9 +359,25 @@ while ($true) {
         if ($newPort) { $Port = $newPort }
         $SftpPort = $Port
 
+        # --- TinyTerm template path ---
+        if ($termChoice -eq "2") {
+            $tmplPrompt = "TinyTerm .emu template path"
+            if ($TinyTermTemplate) { $tmplPrompt += " [default: $TinyTermTemplate]" }
+            $newTemplate = Read-Host $tmplPrompt
+            if ($newTemplate) { $TinyTermTemplate = $newTemplate }
+            if ($TinyTermTemplate -and -not (Test-Path $TinyTermTemplate)) {
+                Write-Host "Warning: template file not found: $TinyTermTemplate" -ForegroundColor Yellow
+            }
+        }
+
         $savedTermChoice = $termChoice
         $savedFtChoice   = $ftChoice
-        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -staticCredsTable $staticCreds -port $Port
+        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
+
+        # --- Verbose toggle ---
+        $verboseToggle = Read-Host "Verbose mode (shows launch commands) [current: $(if($Verbose){'ON'}else{'OFF'})] — press Enter to keep, or type 'on'/'off' to change"
+        if ($verboseToggle -eq 'on')  { $Verbose = $true  }
+        if ($verboseToggle -eq 'off') { $Verbose = $false }
     }
 
     # Apply tool flags from chosen values
@@ -234,12 +404,12 @@ while ($true) {
         $useWinSCP = $false
     }
 
-    Write-Host "`nActive: Terminal=$(if($usePutty){'PuTTY'}elseif($useTinyTerm){'TinyTerm'}else{'None'})  FileTransfer=$(if($useFilezilla){'FileZilla'}elseif($useWinSCP){'WinSCP'}else{'None'})  Port=$Port" -ForegroundColor DarkCyan
+    Write-Host "`nActive: Terminal=$(if($usePutty){'PuTTY'}elseif($useTinyTerm){'TinyTerm'}else{'None'})  FileTransfer=$(if($useFilezilla){'FileZilla'}elseif($useWinSCP){'WinSCP'}else{'None'})  Port=$Port  Verbose=$(if($Verbose){'ON'}else{'OFF'})" -ForegroundColor DarkCyan
 
 # Main connection loop
 while ($true) {
     Write-Host "`n--- New Connection ---" -ForegroundColor Cyan
-    Write-Host "  Endpoint: $lastEnvironment  |  't' = change tools  |  'c' = change credentials  |  'e' = change endpoint" -ForegroundColor DarkGray
+    Write-Host "  Endpoint: $lastEnvironment  |  't' = change tools  |  'c' = change credentials  |  'e' = change endpoint  |  'x' = exit" -ForegroundColor DarkGray
 
     # Prompt for store (accepts special commands)
     $storePrompt = "Enter store number (e.g., ci123)"
@@ -248,6 +418,7 @@ while ($true) {
     $storeInput = Read-Host $storePrompt
 
     if ($storeInput -eq "t") { break }
+    if ($storeInput -eq "x") { exit 0 }
     if ($storeInput -eq "c") {
         while ($true) {
         Write-Host "`nCredential Management:" -ForegroundColor Cyan
@@ -354,15 +525,37 @@ while ($true) {
     # Launch PuTTY if selected
     if ($usePutty) {
         Write-Host "Launching PuTTY..." -ForegroundColor Cyan
-        if ($Verbose) { Write-Host "  CMD: `"$puttyPath`" -l $ConnUsername -P $Port $TargetHost" -ForegroundColor DarkYellow }
-        & $puttyPath -l $ConnUsername -P $Port $TargetHost
+        if ($Verbose) { Write-Host "  CMD: `"$puttyPath`" -ssh $ConnUsername@$TargetHost -P $Port -pw *****" -ForegroundColor DarkYellow }
+        & $puttyPath -ssh "$ConnUsername@$TargetHost" -P $Port -pw $ConnPassword
     }
 
     # Launch TinyTerm if selected
     if ($useTinyTerm) {
         Write-Host "Launching TinyTerm..." -ForegroundColor Cyan
-        if ($Verbose) { Write-Host "  CMD: `"$tinytermPath`" ssh://$ConnUsername`:*****@${TargetHost}:$Port" -ForegroundColor DarkYellow }
-        & $tinytermPath "ssh://$ConnUsername`:$ConnPassword@${TargetHost}:$Port"
+        if ($TinyTermTemplate -and (Test-Path $TinyTermTemplate)) {
+            # Template-based method: inject host/user and use login macros for password
+            $tmpTpx = Join-Path $env:TEMP "puttystart_session.tpx"
+            (Get-Content -Path $TinyTermTemplate) | ForEach-Object {
+                if ($_ -like "node=*")         { "node=$TargetHost" }
+                elseif ($_ -like "user=*")     { "user=$ConnUsername" }
+                elseif ($_ -like "password=*") { "password=" }
+                elseif ($_ -like "remark=*")   { "remark=$TargetHost" }
+                elseif ($_ -like "loginsw=*")  { "loginsw=1" }
+                elseif ($_ -like "loginW2=*")  { "loginW2=Please enter your password:" }
+                elseif ($_ -like "loginS2=*")  { "loginS2=^W$ConnPassword^M" }
+                else { $_ }
+            } | Set-Content -Path $tmpTpx -Encoding ASCII
+            $ttArgs = "-t `"$tmpTpx`" -nosplash -nas"
+            if ($Verbose) { Write-Host "  CMD: `"$tinytermPath`" -t `"$tmpTpx`" -nosplash " -ForegroundColor DarkYellow }
+            Start-Process -FilePath $tinytermPath -ArgumentList $ttArgs
+        } else {
+            if ($TinyTermTemplate) {
+                Write-Host "  Warning: TinyTerm template not found: $TinyTermTemplate" -ForegroundColor Yellow
+                Write-Host "  Update via 't' > tool menu to set a valid template path." -ForegroundColor Yellow
+            } else {
+                Write-Host "  No TinyTerm template configured. Set one via 't' > tool menu." -ForegroundColor Yellow
+            }
+        }
     }
 
     # Launch FileZilla if selected
