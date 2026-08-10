@@ -87,11 +87,60 @@ ExtendLinesOnResize=1
 [term.emu]
 emulate=13
 colorfg0=8
+colorfg1=0
+colorfg2=0
+colorfg3=0
+colorfg4=0
+colorfg5=0
+colorfg6=0
+colorfg7=0
+colorfg8=0
+colorfg9=0
+colorfg10=0
+colorfg11=0
+colorfg12=0
+colorfg13=0
+colorfg14=0
+colorfg15=0
 colorbg0=1
+colorbg1=0
+colorbg2=0
+colorbg3=0
+colorbg4=0
+colorbg5=0
+colorbg6=0
+colorbg7=0
+colorbg8=0
+colorbg9=0
+colorbg10=0
+colorbg11=0
+colorbg12=0
+colorbg13=0
+colorbg14=0
+colorbg15=0
+attribute0=0
+attribute1=2097152
+attribute2=524288
+attribute3=262144
+attribute4=65536
+attribute5=2621440
+attribute6=2359296
+attribute7=2162688
+attribute8=786432
+attribute9=589824
+attribute10=327680
+attribute11=2883584
+attribute12=2621440
+attribute13=2424832
+attribute14=851968
+attribute15=2949120
+cursor=2
+col=80
 scrollback=999
+jumpscroll=0
 mode=0
 loginscheme=UNIX Password
-login=0
+login=1
 user=
 password=
 loginsw=0
@@ -103,10 +152,23 @@ autoconnect=1
 autocmd=0
 CommLink=1
 Keyboard=1
+fontname0=1
 lines=25
-col=80
+custsize=1
 wrap=1
-monochrome=0
+addcr=0
+addlf=0
+bsdel=0
+tabex=0
+nocolor=0
+nocolor_duplicate=1
+monochrome=1
+font0=Term;0,0|STD 437 MS-DOS Latin US
+font1=TinyTERM Unicode;1,0|Unicode Font
+font2=TinyTERM CJK;1,0|Unicode Font
+font3=
+font4=
+font5=
 
 [term.ft]
 protocol=1
@@ -226,6 +288,260 @@ $builtInEmuPath = Join-Path $env:TEMP "puttystart_template.emu"
 $builtInEmuTemplate | Set-Content -Path $builtInEmuPath -Encoding ASCII
 
 $TinyTermTemplate = $builtInEmuPath  # default; config can override with a custom path
+
+# Apply full PuTTY tcxSky session registry settings
+$puttyRegContent = @"
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\Software\SimonTatham\PuTTY\Sessions\tcxSky]
+"TermWidth"=dword:00000050
+"TermHeight"=dword:00000019
+"ResizeAction"=dword:00000003
+"HostName"=""
+"PortNumber"=dword:00000016
+"AddressFamily"=dword:00000000
+"CloseOnExit"=dword:00000001
+"WarnOnClose"=dword:00000001
+"TCPNoDelay"=dword:00000001
+"TCPKeepalives"=dword:00000000
+"LogHost"=""
+"PreConnectCommand"=""
+"ProxyExcludeList"=""
+"ProxyDNS"=dword:00000001
+"ProxyLocalhost"=dword:00000000
+"ProxyMethod"=dword:00000000
+"ProxyHost"="proxy"
+"ProxyPort"=dword:00000050
+"ProxyUsername"=""
+"ProxyPassword"=""
+"ProxyTelnetCommand"="connect %host %port\\n"
+"ProxyLogToTerm"=dword:00000001
+"RemoteCommand"=""
+"NoPTY"=dword:00000000
+"Compression"=dword:00000000
+"PreferKnownHostKeys"=dword:00000001
+"RekeyTime"=dword:0000003c
+"RekeyBytes"="1G"
+"TryAgent"=dword:00000001
+"AgentFwd"=dword:00000000
+"ChangeUsername"=dword:00000000
+"PublicKeyFile"=""
+"DetachedCertificate"=""
+"AuthPlugin"=""
+"SshProt"=dword:00000003
+"ConnectionSharing"=dword:00000000
+"ConnectionSharingUpstream"=dword:00000001
+"ConnectionSharingDownstream"=dword:00000001
+"SSH2DES"=dword:00000000
+"SshNoAuth"=dword:00000000
+"SshNoTrivialAuth"=dword:00000000
+"SshBanner"=dword:00000001
+"AuthTIS"=dword:00000000
+"AuthKI"=dword:00000001
+"SshNoShell"=dword:00000000
+"TerminalType"="xterm"
+"TerminalSpeed"="38400,38400"
+"UserName"=""
+"UserNameFromEnvironment"=dword:00000000
+"LocalUserName"=""
+"RFCEnviron"=dword:00000000
+"PassiveTelnet"=dword:00000000
+"SerialLine"="COM1"
+"SerialSpeed"=dword:00002580
+"SerialDataBits"=dword:00000008
+"SerialStopHalfbits"=dword:00000002
+"SerialParity"=dword:00000000
+"SerialFlowControl"=dword:00000001
+"SUPDUPLocation"="The Internet"
+"SUPDUPCharset"=dword:00000000
+"SUPDUPMoreProcessing"=dword:00000000
+"SUPDUPScrolling"=dword:00000000
+"BackspaceIsDelete"=dword:00000001
+"RXVTHomeEnd"=dword:00000000
+"LinuxFunctionKeys"=dword:00000002
+"ShiftedArrowKeys"=dword:00000000
+"NoApplicationCursors"=dword:00000000
+"NoApplicationKeys"=dword:00000000
+"NoMouseReporting"=dword:00000000
+"NoRemoteResize"=dword:00000000
+"NoAltScreen"=dword:00000000
+"NoRemoteWinTitle"=dword:00000000
+"NoRemoteClearScroll"=dword:00000000
+"NoDBackspace"=dword:00000000
+"NoRemoteCharset"=dword:00000000
+"RemoteQTitleAction"=dword:00000001
+"ApplicationCursorKeys"=dword:00000000
+"ApplicationKeypad"=dword:00000000
+"NetHackKeypad"=dword:00000000
+"TelnetKey"=dword:00000000
+"TelnetRet"=dword:00000001
+"AltF4"=dword:00000001
+"AltSpace"=dword:00000000
+"AltOnly"=dword:00000000
+"LocalEcho"=dword:00000002
+"LocalEdit"=dword:00000002
+"AlwaysOnTop"=dword:00000000
+"FullScreenOnAltEnter"=dword:00000000
+"ScrollOnKey"=dword:00000000
+"ScrollOnDisp"=dword:00000001
+"EraseToScrollback"=dword:00000001
+"ComposeKey"=dword:00000000
+"CtrlAltKeys"=dword:00000001
+"WinTitle"=""
+"ScrollbackLines"=dword:000007d0
+"DECOriginMode"=dword:00000000
+"AutoWrapMode"=dword:00000001
+"LFImpliesCR"=dword:00000000
+"CurType"=dword:00000000
+"BlinkCur"=dword:00000000
+"Beep"=dword:00000001
+"BeepInd"=dword:00000000
+"BellOverload"=dword:00000001
+"BellOverloadN"=dword:00000005
+"BellWaveFile"=""
+"ScrollBar"=dword:00000001
+"ScrollBarFullScreen"=dword:00000000
+"LockSize"=dword:00000000
+"BCE"=dword:00000001
+"BlinkText"=dword:00000000
+"WinNameAlways"=dword:00000001
+"Font"="Courier New"
+"FontIsBold"=dword:00000000
+"FontCharSet"=dword:00000000
+"FontHeight"=dword:0000000a
+"FontQuality"=dword:00000000
+"LogFileName"="putty.log"
+"LogType"=dword:00000000
+"LogFileClash"=dword:ffffffff
+"LogFlush"=dword:00000001
+"LogHeader"=dword:00000001
+"SSHLogOmitPasswords"=dword:00000001
+"SSHLogOmitData"=dword:00000000
+"HideMousePtr"=dword:00000000
+"SunkenEdge"=dword:00000000
+"WindowBorder"=dword:00000001
+"Answerback"="PuTTY"
+"Printer"=""
+"DisableArabicShaping"=dword:00000000
+"DisableBidi"=dword:00000000
+"DisableBracketedPaste"=dword:00000000
+"ANSIColour"=dword:00000001
+"Xterm256Colour"=dword:00000001
+"TrueColour"=dword:00000001
+"UseSystemColours"=dword:00000000
+"TryPalette"=dword:00000000
+"BoldAsColour"=dword:00000001
+"MouseIsXterm"=dword:00000000
+"RectSelect"=dword:00000000
+"PasteControls"=dword:00000000
+"RawCNP"=dword:00000000
+"UTF8linedraw"=dword:00000000
+"PasteRTF"=dword:00000000
+"MouseOverride"=dword:00000001
+"MouseAutocopy"=dword:00000001
+"FontVTMode"=dword:00000004
+"LineCodePage"=""
+"CJKAmbigWide"=dword:00000000
+"UTF8Override"=dword:00000001
+"CapsLockCyr"=dword:00000000
+"X11Forward"=dword:00000000
+"X11Display"=""
+"X11AuthType"=dword:00000001
+"X11AuthFile"=""
+"LocalPortAcceptAll"=dword:00000000
+"RemotePortAcceptAll"=dword:00000000
+"BugIgnore1"=dword:00000000
+"BugPlainPW1"=dword:00000000
+"BugRSA1"=dword:00000000
+"BugIgnore2"=dword:00000000
+"BugDeriveKey2"=dword:00000000
+"BugRSAPad2"=dword:00000000
+"BugPKSessID2"=dword:00000000
+"BugRekey2"=dword:00000000
+"BugMaxPkt2"=dword:00000000
+"BugOldGex2"=dword:00000000
+"BugWinadj"=dword:00000000
+"BugChanReq"=dword:00000000
+"BugDropStart"=dword:00000001
+"BugFilterKexinit"=dword:00000001
+"BugRSASHA2CertUserauth"=dword:00000000
+"BugHMAC2"=dword:00000000
+"StampUtmp"=dword:00000001
+"LoginShell"=dword:00000001
+"ScrollbarOnLeft"=dword:00000000
+"ShadowBold"=dword:00000000
+"BoldFont"=""
+"BoldFontIsBold"=dword:00000000
+"BoldFontCharSet"=dword:00000000
+"BoldFontHeight"=dword:00000000
+"WideFont"=""
+"WideFontIsBold"=dword:00000000
+"WideFontCharSet"=dword:00000000
+"WideFontHeight"=dword:00000000
+"WideBoldFont"=""
+"WideBoldFontIsBold"=dword:00000000
+"WideBoldFontCharSet"=dword:00000000
+"WideBoldFontHeight"=dword:00000000
+"ShadowBoldOffset"=dword:00000001
+"CRImpliesLF"=dword:00000000
+"WindowClass"=""
+"Present"=dword:00000001
+"Protocol"="ssh"
+"PingInterval"=dword:00000000
+"PingIntervalSecs"=dword:00000000
+"TerminalModes"="CS7=A,CS8=A,DISCARD=A,DSUSP=A,ECHO=A,ECHOCTL=A,ECHOE=A,ECHOK=A,ECHOKE=A,ECHONL=A,EOF=A,EOL=A,EOL2=A,ERASE=A,FLUSH=A,ICANON=A,ICRNL=A,IEXTEN=A,IGNCR=A,IGNPAR=A,IMAXBEL=A,INLCR=A,INPCK=A,INTR=A,ISIG=A,ISTRIP=A,IUCLC=A,IUTF8=A,IXANY=A,IXOFF=A,IXON=A,KILL=A,LNEXT=A,NOFLSH=A,OCRNL=A,OLCUC=A,ONLCR=A,ONLRET=A,ONOCR=A,OPOST=A,PARENB=A,PARMRK=A,PARODD=A,PENDIN=A,QUIT=A,REPRINT=A,START=A,STATUS=A,STOP=A,SUSP=A,SWTCH=A,TOSTOP=A,WERASE=A,XCASE=A"
+"Environment"=""
+"GssapiFwd"=dword:00000000
+"Cipher"="aes,chacha20,aesgcm,3des,WARN,des,blowfish,arcfour"
+"KEX"="ntru-curve25519,mlkem-curve25519,mlkem-nist,ecdh,dh-gex-sha1,dh-group18-sha512,dh-group17-sha512,dh-group16-sha512,dh-group15-sha512,dh-group14-sha1,rsa,WARN,dh-group1-sha1"
+"HostKey"="ed448,ed25519,ecdsa,rsa,dsa,WARN"
+"GssapiRekey"=dword:00000002
+"AuthGSSAPI"=dword:00000001
+"AuthGSSAPIKEX"=dword:00000001
+"GSSLibs"="gssapi32,sspi,custom"
+"GSSCustom"=""
+"BellOverloadT"=dword:000007d0
+"BellOverloadS"=dword:00001388
+"Colour0"="187,187,187"
+"Colour1"="255,255,255"
+"Colour2"="0,0,0"
+"Colour3"="85,85,85"
+"Colour4"="0,0,0"
+"Colour5"="0,255,0"
+"Colour6"="0,0,0"
+"Colour7"="85,85,85"
+"Colour8"="187,0,0"
+"Colour9"="255,85,85"
+"Colour10"="0,187,0"
+"Colour11"="85,255,85"
+"Colour12"="187,187,0"
+"Colour13"="255,255,85"
+"Colour14"="0,0,187"
+"Colour15"="85,85,255"
+"Colour16"="187,0,187"
+"Colour17"="255,85,255"
+"Colour18"="0,187,187"
+"Colour19"="85,255,255"
+"Colour20"="187,187,187"
+"Colour21"="255,255,255"
+"Wordness0"="0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
+"Wordness32"="0,1,2,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,1,1,1,1,1,1"
+"Wordness64"="1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,1,1,1,2"
+"Wordness96"="1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,1,1,1,1"
+"Wordness128"="1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"
+"Wordness160"="1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"
+"Wordness192"="2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2"
+"Wordness224"="2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,2,2,2,2,2,2,2,2"
+"MousePaste"="explicit"
+"CtrlShiftIns"="explicit"
+"CtrlShiftCV"="none"
+"PortForwardings"=""
+"SSHManualHostKeys"=""
+"@
+
+$puttyRegFile = Join-Path $env:TEMP "puttystart_tcxSky.reg"
+$puttyRegContent | Set-Content -Path $puttyRegFile -Encoding Unicode
+$null = reg import $puttyRegFile 2>&1
 
 # Config file in same directory as this script
 $configPath = Join-Path $PSScriptRoot "puttystart.cfg"
@@ -525,8 +841,8 @@ while ($true) {
     # Launch PuTTY if selected
     if ($usePutty) {
         Write-Host "Launching PuTTY..." -ForegroundColor Cyan
-        if ($Verbose) { Write-Host "  CMD: `"$puttyPath`" -ssh $ConnUsername@$TargetHost -P $Port -pw *****" -ForegroundColor DarkYellow }
-        & $puttyPath -ssh "$ConnUsername@$TargetHost" -P $Port -pw $ConnPassword
+        if ($Verbose) { Write-Host "  CMD: `"$puttyPath`" -load tcxSky -ssh $ConnUsername@$TargetHost -P $Port -pw *****" -ForegroundColor DarkYellow }
+        & $puttyPath -load "tcxSky" -ssh "$ConnUsername@$TargetHost" -P $Port -pw $ConnPassword
     }
 
     # Launch TinyTerm if selected
@@ -540,9 +856,12 @@ while ($true) {
                 elseif ($_ -like "user=*")     { "user=$ConnUsername" }
                 elseif ($_ -like "password=*") { "password=" }
                 elseif ($_ -like "remark=*")   { "remark=$TargetHost" }
+                elseif ($_ -like "login=*")  { "login=1" }
                 elseif ($_ -like "loginsw=*")  { "loginsw=1" }
-                elseif ($_ -like "loginW2=*")  { "loginW2=Please enter your password:" }
-                elseif ($_ -like "loginS2=*")  { "loginS2=^W$ConnPassword^M" }
+                elseif ($_ -like "loginW1=*")  { "loginW1=password:" }
+                elseif ($_ -like "loginS1=*")  { "loginS1=$ConnPassword^M" }
+                elseif ($_ -like "loginW2=*")  { "loginW2=password:" }
+                elseif ($_ -like "loginS2=*")  { "loginS2=$ConnPassword^M" }
                 else { $_ }
             } | Set-Content -Path $tmpTpx -Encoding ASCII
             $ttArgs = "-t `"$tmpTpx`" -nosplash -nas"
