@@ -401,7 +401,7 @@ Windows Registry Editor Version 5.00
 "BellWaveFile"=""
 "ScrollBar"=dword:00000001
 "ScrollBarFullScreen"=dword:00000000
-"LockSize"=dword:00000000
+"LockSize"=dword:00000002
 "BCE"=dword:00000001
 "BlinkText"=dword:00000000
 "WinNameAlways"=dword:00000001
