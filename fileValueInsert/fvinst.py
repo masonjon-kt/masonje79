@@ -166,7 +166,7 @@ def process_file(file_path, search_pattern, insert_value, create, delete, search
                 return
             # No match found — insert the value as a new line
             if new_lines and not new_lines[-1].endswith(('\n', '\r\n')):
-                new_lines.append(eol)
+                new_lines[-1] += eol
             new_lines.append(insert_value + eol)
             std_out('info', f"No match found for '{search_pattern}'. Inserted: {insert_value}")
         else:
