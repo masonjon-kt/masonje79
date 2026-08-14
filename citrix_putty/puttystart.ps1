@@ -728,7 +728,7 @@ while ($true) {
     Write-Host "  Endpoint: $lastEnvironment  |  't' = change tools  |  'c' = credentials mgmt  |  'e' = change endpoint  |  'x' = exit" -ForegroundColor DarkGray
 
     # Prompt for store (accepts special commands)
-    $storePrompt = "Enter store number (e.g., ci123)"
+    $storePrompt = "Store (e.g., ci123/FQDN/IP)"
     if ($lastStore) { $storePrompt += " [default: $lastStore]" }
 
     $storeInput = Read-Host $storePrompt
@@ -826,7 +826,14 @@ while ($true) {
     $Environment = $lastEnvironment
 
     # Construct target host
-    $TargetHost = "$Environment.$Store.kroger.com"
+    # If entry matches standard store format (2 letters + 3 digits), build Kroger hostname.
+    # Otherwise, use the entry directly as a hostname or IP address.
+    if ($Store -match '^[a-zA-Z]{2}\d{3}$') {
+        $TargetHost = "$Environment.$Store.kroger.com"
+    } else {
+        $TargetHost = $Store
+        Write-Host "Non-standard entry — connecting directly to: $TargetHost" -ForegroundColor DarkYellow
+    }
 
     # Save last store and endpoint to config
     Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds
