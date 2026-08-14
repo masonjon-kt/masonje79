@@ -582,7 +582,7 @@ $SecurePassword = $null
 $today = (Get-Date).ToString("yyyy-MM-dd")
 
 if (Test-Path $configPath) {
-    $cfg = Get-Content $configPath -Raw | ConvertFrom-StringData
+    $cfg = (Get-Content $configPath -Raw) -replace '\\', '\\\\' | ConvertFrom-StringData
     if ($cfg.TermChoice)          { $savedTermChoice  = $cfg.TermChoice }
     if ($cfg.FtChoice)            { $savedFtChoice    = $cfg.FtChoice }
     if ($cfg.Username)            { $Username         = $cfg.Username }
