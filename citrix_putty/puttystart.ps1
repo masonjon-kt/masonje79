@@ -725,7 +725,7 @@ while ($true) {
 # Main connection loop
 while ($true) {
     Write-Host "`n--- New Connection ---" -ForegroundColor Cyan
-    Write-Host "  Endpoint: $lastEnvironment  |  't' = change tools  |  'c' = change credentials  |  'e' = change endpoint  |  'x' = exit" -ForegroundColor DarkGray
+    Write-Host "  Endpoint: $lastEnvironment  |  't' = change tools  |  'c' = credentials mgmt  |  'e' = change endpoint  |  'x' = exit" -ForegroundColor DarkGray
 
     # Prompt for store (accepts special commands)
     $storePrompt = "Enter store number (e.g., ci123)"
@@ -739,11 +739,12 @@ while ($true) {
         while ($true) {
         Write-Host "`nCredential Management:" -ForegroundColor Cyan
         Write-Host "1. Update daily password (PWD)" -ForegroundColor White
-        Write-Host "2. Add/update static credentials for a store" -ForegroundColor White
-        Write-Host "3. Remove static credentials for a store" -ForegroundColor White
-        Write-Host "4. List stores with static credentials" -ForegroundColor White
-        Write-Host "5. Exit" -ForegroundColor White
-        $credAction = Read-Host "Select (1-5)"
+        Write-Host "2. Copy current password to clipboard" -ForegroundColor White
+        Write-Host "3. Add/update static credentials for a store" -ForegroundColor White
+        Write-Host "4. Remove static credentials for a store" -ForegroundColor White
+        Write-Host "5. List stores with static credentials" -ForegroundColor White
+        Write-Host "6. Exit" -ForegroundColor White
+        $credAction = Read-Host "Select (1-6)"
         switch ($credAction) {
             "1" {
                 $creds = Request-Credentials
@@ -754,6 +755,14 @@ while ($true) {
                 Write-Host "Daily credentials updated." -ForegroundColor Green
             }
             "2" {
+                if ($Password) {
+                    Set-Clipboard -Value $Password
+                    Write-Host "Current password copied to clipboard." -ForegroundColor Green
+                } else {
+                    Write-Host "No password currently loaded." -ForegroundColor Yellow
+                }
+            }
+            "3" {
                 $storeKey = (Read-Host "Enter store number to set static credentials for").ToLower()
                 if ($storeKey) {
                     $staticUser = Read-Host "Enter username for $storeKey [default: $Username]"
@@ -770,7 +779,7 @@ while ($true) {
                     Write-Host "Static credentials saved for $storeKey." -ForegroundColor Green
                 }
             }
-            "3" {
+            "4" {
                 $storeKey = (Read-Host "Enter store number to remove").ToLower()
                 if ($staticCreds.ContainsKey($storeKey)) {
                     $staticCreds.Remove($storeKey)
@@ -780,7 +789,7 @@ while ($true) {
                     Write-Host "No static credentials found for '$storeKey'." -ForegroundColor Yellow
                 }
             }
-            "4" {
+            "5" {
                 if ($staticCreds.Count -eq 0) {
                     Write-Host "No static credentials stored." -ForegroundColor Yellow
                 } else {
@@ -790,9 +799,9 @@ while ($true) {
                     }
                 }
             }
-            "5" { break }
+            "6" { break }
         }
-        if ($credAction -eq "5") { break }
+        if ($credAction -eq "6" -or $credAction -eq "2") { break }
         }
         continue
     }
