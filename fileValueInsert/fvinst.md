@@ -58,69 +58,131 @@ python3 fvinst.py -f <file> [options]
 
 ## Examples
 
+All examples are written for Windows `.bat` files.
+
 ### Append a value (only if not already present)
 
-```bash
-# Appends "MYVALUE" to the end of the file if it doesn't already exist
-python3 fvinst.py -f ./config.txt -i "MYVALUE"
+```bat
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -i "MYVALUE"
+IF %ERRORLEVEL% NEQ 0 GOTO :ERROR
 ```
+
+---
 
 ### Replace lines matching a pattern
 
-```bash
-# Replaces any line matching "HOST=*" with "HOST=newserver"
-python3 fvinst.py -f ./config.txt -s "HOST=*" -i "HOST=newserver"
+```bat
+REM Replace any line matching "HOST=*" with "HOST=newserver"
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -s "HOST=*" -i "HOST=newserver"
+IF %ERRORLEVEL% NEQ 0 GOTO :ERROR
 
-# Replace a line matching a prefix pattern
-python3 fvinst.py -f ./settings.txt -s "timeout=*" -i "timeout=30"
+REM Replace a timeout value
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -s "timeout=*" -i "timeout=30"
+IF %ERRORLEVEL% NEQ 0 GOTO :ERROR
 ```
+
+---
 
 ### Replace only if matched — no append on no match
 
-```bash
-# Updates the PORT line only if it exists; does nothing if not found
-python3 fvinst.py -f ./config.txt -s "PORT=*" -i "PORT=8080" -se
+```bat
+REM Updates PORT only if the line exists; does nothing if not found
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -s "PORT=*" -i "PORT=8080" -se
+IF %ERRORLEVEL% NEQ 0 GOTO :ERROR
 ```
+
+---
 
 ### Delete matching lines
 
-```bash
-# Deletes all lines matching "DEBUG=*"
-python3 fvinst.py -f ./config.txt -s "DEBUG=*" -d
+```bat
+REM Delete all lines matching "DEBUG=*"
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -s "DEBUG=*" -d
+IF %ERRORLEVEL% NEQ 0 GOTO :ERROR
 
-# Delete a specific exact line
-python3 fvinst.py -f ./config.txt -s "REMOVE_THIS_LINE" -d
+REM Delete a specific exact line
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -s "REMOVE_THIS_LINE" -d
+IF %ERRORLEVEL% NEQ 0 GOTO :ERROR
 ```
+
+---
 
 ### Search only (no file changes)
 
-```bash
-# Exit 0 if found, -1 if not found — useful in scripts
-python3 fvinst.py -f ./config.txt -s "HOST=*" -so
-if [ $? -eq 0 ]; then echo "HOST entry exists"; fi
-
-# Search for an exact value
-python3 fvinst.py -f ./config.txt -s "MYVALUE" -so
+```bat
+REM Check if HOST entry exists — exit 0 found, non-zero not found
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -s "HOST=*" -so
+IF %ERRORLEVEL% NEQ 0 (
+    ECHO HOST entry not found
+    GOTO :NOT_FOUND
+)
+ECHO HOST entry exists
 ```
+
+> **Note:** Search-only returns `-1` when not found. In a `.bat` file,
+> `%ERRORLEVEL%` sees `-1` as a non-zero value, so `NEQ 0` catches it correctly.
+
+---
 
 ### Create file if it doesn't exist, then insert
 
-```bash
-# Creates config.txt if missing, then appends the value
-python3 fvinst.py -f ./config.txt -i "HOST=myserver" -c true
+```bat
+REM Creates the file if missing, then appends the value
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -i "HOST=myserver" -c true
+IF %ERRORLEVEL% NEQ 0 GOTO :ERROR
 ```
+
+---
 
 ### Wildcard patterns
 
-```bash
-# Match any line starting with "server."
-python3 fvinst.py -f ./hosts.txt -s "server.*" -d
+```bat
+REM Match any line starting with "server."
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -s "server.*" -d
+IF %ERRORLEVEL% NEQ 0 GOTO :ERROR
 
-# Match lines with exactly 3 characters
-python3 fvinst.py -f ./codes.txt -s "???" -so
+REM Match lines with exactly 3 characters
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -s "???" -so
+IF %ERRORLEVEL% NEQ 0 GOTO :NOT_FOUND
 
-# Match a literal asterisk in the line
-python3 fvinst.py -f ./file.txt -s "prefix[*]suffix" -so
+REM Match a literal asterisk in the line
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -s "prefix[*]suffix" -so
+IF %ERRORLEVEL% NEQ 0 GOTO :NOT_FOUND
+```
+
+---
+
+### Full example script with error handling
+
+```bat
+@ECHO OFF
+
+REM Step 1: Ensure the config file exists with a HOST entry
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -i "HOST=myserver" -c true
+IF %ERRORLEVEL% NEQ 0 GOTO :ERROR
+
+REM Step 2: Replace the PORT value if it exists
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -s "PORT=*" -i "PORT=8080" -se
+IF %ERRORLEVEL% NEQ 0 GOTO :ERROR
+
+REM Step 3: Remove any DEBUG lines
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -s "DEBUG=*" -d
+IF %ERRORLEVEL% NEQ 0 GOTO :ERROR
+
+REM Step 4: Confirm HOST is present
+python3 C:\adx_spgm\fvinst.py -f C:\adx_upgm\adxcfg.dat -s "HOST=*" -so
+IF %ERRORLEVEL% NEQ 0 GOTO :NOT_FOUND
+
+ECHO Configuration complete.
+GOTO :EOF
+
+:NOT_FOUND
+ECHO Required entry not found in config. Aborting.
+EXIT /B 1
+
+:ERROR
+ECHO fvinst.py failed with error code %ERRORLEVEL%.
+EXIT /B %ERRORLEVEL%
 ```
 
 ---
