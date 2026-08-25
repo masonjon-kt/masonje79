@@ -13,11 +13,13 @@
 #   t   Open tool selection menu (change terminal / file transfer app)
 #   c   Open credential management menu (update daily PWD, manage static creds)
 #   e   Change the current endpoint (mc, cc, fc, etc.)
+#   p/t/f/w <host>   Launch PuTTY/TinyTerm/FileZilla/WinSCP for one host
 #
 # Examples:
 #   .\puttystart.ps1                 # Normal run, defaults to port 22
 #   .\puttystart.ps1 -v              # Verbose — shows launch commands
 #   .\puttystart.ps1 -Port 2222      # Connect on a non-standard SSH port
+#   Store prompt: p mc.ci123         # Launch only PuTTY for this host
 
 param(
     [string]$Port = $null,
@@ -744,7 +746,7 @@ while ($true) {
 # Main connection loop
 while ($true) {
     Write-Host "`n--- New Connection ---" -ForegroundColor Cyan
-    Write-Host "  Endpoint: $lastEnvironment  |  't' = change tools  |  'c' = credentials mgmt  |  'e' = change endpoint  |  'x' = exit" -ForegroundColor DarkGray
+    Write-Host "  Endpoint: $lastEnvironment  |  'u' = usage  |  'x' = exit" -ForegroundColor DarkGray
 
     # Prompt for store (accepts special commands)
     $storePrompt = "Store (e.g., ci123 / fc.ci123 / FQDN / IP)"
@@ -752,8 +754,27 @@ while ($true) {
 
     $storeInput = Read-Host $storePrompt
 
+    if ($storeInput -eq "u") {
+        Write-Host "`nStore commands:" -ForegroundColor Cyan
+        Write-Host "  p <host>  Launch PuTTY" -ForegroundColor White
+        Write-Host "  t <host>  Launch TinyTerm" -ForegroundColor White
+        Write-Host "  f <host>  Launch FileZilla" -ForegroundColor White
+        Write-Host "  w <host>  Launch WinSCP" -ForegroundColor White
+        Write-Host "  t         Change tools" -ForegroundColor White
+        Write-Host "  c         Credential management" -ForegroundColor White
+        Write-Host "  e         Change endpoint" -ForegroundColor White
+        Write-Host "  x         Exit" -ForegroundColor White
+        continue
+    }
     if ($storeInput -eq "t") { break }
     if ($storeInput -eq "x") { exit 0 }
+
+    $singleTool = $null
+    if ($storeInput -match '^(p|t|f|w)\s+(.+)$') {
+        $singleTool = $Matches[1].ToLower()
+        $storeInput = $Matches[2].Trim()
+    }
+
     if ($storeInput -eq "c") {
         while ($true) {
         Write-Host "`nCredential Management:" -ForegroundColor Cyan
@@ -844,6 +865,28 @@ while ($true) {
     $lastStore = $Store
     $Environment = $lastEnvironment
 
+    $launchPutty = $usePutty
+    $launchTinyTerm = $useTinyTerm
+    $launchFilezilla = $useFilezilla
+    $launchWinSCP = $useWinSCP
+    if ($singleTool) {
+        $launchPutty = ($singleTool -eq "p")
+        $launchTinyTerm = ($singleTool -eq "t")
+        $launchFilezilla = ($singleTool -eq "f")
+        $launchWinSCP = ($singleTool -eq "w")
+
+        $requestedToolPath = switch ($singleTool) {
+            "p" { $puttyPath }
+            "t" { $tinytermPath }
+            "f" { $filezillaPath }
+            "w" { $winscpPath }
+        }
+        if (-not (Test-Path $requestedToolPath)) {
+            Write-Host "Requested tool is not installed or was not found: $requestedToolPath" -ForegroundColor Yellow
+            continue
+        }
+    }
+
     # Construct target host
     # If entry matches standard store format (2 letters + 3 digits), build Kroger hostname.
     # If entry matches endpoint.store format (e.g. fc.ci123 or cc.ci123), append .kroger.com.
@@ -877,14 +920,14 @@ while ($true) {
     Write-Host "Password copied to clipboard." -ForegroundColor Green
 
     # Launch PuTTY if selected
-    if ($usePutty) {
+    if ($launchPutty) {
         Write-Host "Launching PuTTY..." -ForegroundColor Cyan
         if ($Verbose) { Write-Host "  CMD: `"$puttyPath`" -load tcxSky -ssh $ConnUsername@$TargetHost -P $Port -pw *****" -ForegroundColor DarkYellow }
         & $puttyPath -load "tcxSky" -ssh "$ConnUsername@$TargetHost" -P $Port -pw $ConnPassword
     }
 
     # Launch TinyTerm if selected
-    if ($useTinyTerm) {
+    if ($launchTinyTerm) {
         Write-Host "Launching TinyTerm..." -ForegroundColor Cyan
         if ($TinyTermTemplate -and (Test-Path $TinyTermTemplate)) {
             # Template-based method: inject host/user and use login macros for password
@@ -916,20 +959,20 @@ while ($true) {
     }
 
     # Launch FileZilla if selected
-    if ($useFilezilla) {
+    if ($launchFilezilla) {
         Write-Host "Launching FileZilla..." -ForegroundColor Cyan
         if ($Verbose) { Write-Host "  CMD: `"$filezillaPath`" sftp://$ConnUsername`:*****@${TargetHost}:$SftpPort" -ForegroundColor DarkYellow }
         & $filezillaPath "sftp://$ConnUsername`:$ConnPassword@${TargetHost}:$SftpPort"
     }
 
     # Launch WinSCP if selected
-    if ($useWinSCP) {
+    if ($launchWinSCP) {
         Write-Host "Launching WinSCP..." -ForegroundColor Cyan
         if ($Verbose) { Write-Host "  CMD: `"$winscpPath`" sftp://$ConnUsername`:*****@${TargetHost}:$SftpPort" -ForegroundColor DarkYellow }
         & $winscpPath "sftp://$ConnUsername`:$ConnPassword@${TargetHost}:$SftpPort"
     }
     
-    if ($usePutty -or $useTinyTerm -or $useFilezilla -or $useWinSCP) {
+    if ($launchPutty -or $launchTinyTerm -or $launchFilezilla -or $launchWinSCP) {
         Write-Host "Session(s) closed. Ready for next connection." -ForegroundColor Yellow
     }
 }
