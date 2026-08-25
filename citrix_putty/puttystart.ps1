@@ -576,7 +576,15 @@ function Save-Config {
             $lines += "Static_${store}_Password=$encStatic"
         }
     }
-    $lines -join "`n" | Set-Content $configPath
+    $tempConfigPath = "$configPath.$([guid]::NewGuid().ToString('N')).tmp"
+    try {
+        $lines -join "`n" | Set-Content -Path $tempConfigPath
+        Move-Item -LiteralPath $tempConfigPath -Destination $configPath -Force
+    } finally {
+        if (Test-Path -LiteralPath $tempConfigPath) {
+            Remove-Item -LiteralPath $tempConfigPath -Force
+        }
+    }
 }
 
 # Load saved config
