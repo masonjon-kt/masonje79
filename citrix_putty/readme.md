@@ -115,6 +115,17 @@ The commands are:
 - `f <host>` launches FileZilla only
 - `w <host>` launches WinSCP only
 
+The host is optional. When it is omitted, the command uses the last store or host entered:
+
+```text
+p
+t
+f
+w
+```
+
+If no previous host is available, enter the host explicitly after the tool letter.
+
 For example:
 
 ```text
