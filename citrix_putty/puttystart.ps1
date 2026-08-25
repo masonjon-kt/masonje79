@@ -13,7 +13,7 @@
 #   t   Open tool selection menu (change terminal / file transfer app)
 #   c   Open credential management menu (update daily PWD, manage static creds)
 #   e   Change the current endpoint (mc, cc, fc, etc.)
-#   p/t/f/w <host>   Launch PuTTY/TinyTerm/FileZilla/WinSCP for one host
+#   p/t/f/w [<host>]  Launch PuTTY/TinyTerm/FileZilla/WinSCP for one host
 #
 # Examples:
 #   .\puttystart.ps1                 # Normal run, defaults to port 22
@@ -752,7 +752,7 @@ while ($true) {
     $storePrompt = "Store (e.g., ci123 / fc.ci123 / FQDN / IP)"
     if ($lastStore) { $storePrompt += " [default: $lastStore]" }
 
-    $storeInput = Read-Host $storePrompt
+    $storeInput = (Read-Host $storePrompt).Trim()
 
     if ($storeInput -eq "u") {
         Write-Host "`nStore commands:" -ForegroundColor Cyan
@@ -770,9 +770,16 @@ while ($true) {
     if ($storeInput -eq "x") { exit 0 }
 
     $singleTool = $null
-    if ($storeInput -match '^(p|t|f|w)\s+(.+)$') {
+    if ($storeInput -match '^(p|t|f|w)(?:\s+(.+))?$') {
         $singleTool = $Matches[1].ToLower()
-        $storeInput = $Matches[2].Trim()
+        if ($Matches[2]) {
+            $storeInput = $Matches[2].Trim()
+        } elseif ($lastStore) {
+            $storeInput = $lastStore
+        } else {
+            Write-Host "No default host is available. Enter a host after '$singleTool'." -ForegroundColor Yellow
+            continue
+        }
     }
 
     if ($storeInput -eq "c") {
