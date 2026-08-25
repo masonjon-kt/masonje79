@@ -30,6 +30,12 @@ $Verbose = $v.IsPresent
 function Request-Credentials {
     $u = Read-Host "Enter username [default: 4690]"
     if (-not $u) { $u = "4690" }
+    $password = Request-Password
+    return @{ Username = $u; Password = $password.Password; SecurePassword = $password.SecurePassword }
+}
+
+# Helper: prompt for a password without changing the current username
+function Request-Password {
     do {
         $sp = Read-Host "Enter password" -AsSecureString
         if ($sp.Length -eq 0) {
@@ -39,7 +45,7 @@ function Request-Credentials {
     $p = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
         [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($sp)
     )
-    return @{ Username = $u; Password = $p; SecurePassword = $sp }
+    return @{ Password = $p; SecurePassword = $sp }
 }
 
 # Check if PuTTY is installed
@@ -579,6 +585,7 @@ $savedFtChoice = "0"
 $Username = "4690"
 $Password = $null
 $SecurePassword = $null
+$portalOpened = $false
 $today = (Get-Date).ToString("yyyy-MM-dd")
 
 if (Test-Path $configPath) {
@@ -606,9 +613,10 @@ if (Test-Path $configPath) {
             Write-Host "Could not decrypt saved password. Please re-enter credentials." -ForegroundColor Yellow
         }
     } elseif ($cfg.PwdDate -and $cfg.PwdDate -ne $today) {
-        Write-Host "Saved password is from $($cfg.PasswordDate). Opening password portal..." -ForegroundColor Yellow
+        Write-Host "Saved password is from $($cfg.PwdDate). Opening password portal..." -ForegroundColor Yellow
         Set-Location "C:\Program Files (x86)\Microsoft\Edge\Application\"
         Start-Process "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" "https://possecurity-prod.cdengpos.rch-cdc-cdeprod.kroger.com/#/"
+        $portalOpened = $true
     }
 
     # Load static credentials
@@ -636,7 +644,10 @@ if (Test-Path $configPath) {
 # Prompt for credentials if not loaded from config
 if (-not $Password) {
     Write-Host "Opening password portal..." -ForegroundColor Yellow
-    Start-Process "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" "https://possecurity-prod.cdengpos.rch-cdc-cdeprod.kroger.com/#/"
+    if (-not $portalOpened) {
+        Start-Process "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" "https://possecurity-prod.cdengpos.rch-cdc-cdeprod.kroger.com/#/"
+        $portalOpened = $true
+    }
     $creds = Request-Credentials
     $Username      = $creds.Username
     $Password      = $creds.Password
@@ -728,7 +739,7 @@ while ($true) {
     Write-Host "  Endpoint: $lastEnvironment  |  't' = change tools  |  'c' = credentials mgmt  |  'e' = change endpoint  |  'x' = exit" -ForegroundColor DarkGray
 
     # Prompt for store (accepts special commands)
-    $storePrompt = "Store (e.g., ci123/FQDN/IP)"
+    $storePrompt = "Store (e.g., ci123 / fc.ci123 / FQDN / IP)"
     if ($lastStore) { $storePrompt += " [default: $lastStore]" }
 
     $storeInput = Read-Host $storePrompt
@@ -827,9 +838,12 @@ while ($true) {
 
     # Construct target host
     # If entry matches standard store format (2 letters + 3 digits), build Kroger hostname.
+    # If entry matches endpoint.store format (e.g. fc.ci123 or cc.ci123), append .kroger.com.
     # Otherwise, use the entry directly as a hostname or IP address.
     if ($Store -match '^[a-zA-Z]{2}\d{3}$') {
         $TargetHost = "$Environment.$Store.kroger.com"
+    } elseif ($Store -match '^[a-zA-Z]{2,}\.[a-zA-Z]{2}\d{3}$') {
+        $TargetHost = "$Store.kroger.com"
     } else {
         $TargetHost = $Store
         Write-Host "Non-standard entry — connecting directly to: $TargetHost" -ForegroundColor DarkYellow
