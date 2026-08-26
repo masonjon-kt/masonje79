@@ -28,9 +28,19 @@ Optional parameters:
 .\puttystart.ps1 -v
 ```
 
-`-v` displays the launch command before starting a tool. Passwords are masked in verbose output.
+## Secure Citrix Desktop Setup
 
-`-Port` changes the SSH and SFTP port. The default is `22`.
+Before running the script in a secure Citrix session, copy the `puttystart.ps1` user's Citrix Desktop.
+
+Open PowerShell in the copied folder and run:
+
+```powershell
+cd "$env:USERPROFILE\Desktop\"
+.\puttystart.ps1
+```
+
+The script creates `puttystart.cfg` in that same Desktop folder. Keep both `puttystart.ps1` and `puttystart.cfg` together so saved tools, preferences, and credentials are available the next time the script is run.
+
 
 ## First Startup
 
