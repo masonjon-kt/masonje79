@@ -662,6 +662,7 @@ if (-not $Password) {
     $Username      = $creds.Username
     $Password      = $creds.Password
     $SecurePassword = $creds.SecurePassword
+    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
 }
 
 # Tool selection loop
