@@ -25,3 +25,5 @@ __pycache__/
 venv/
 env/
 citrix_putty/puttystart.sh
+citrix_putty/puttystart.sh.cfg
+*.example
