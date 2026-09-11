@@ -99,12 +99,22 @@ python3 fvinxml.py -f contrext.xml \
   -a location
 
 # Check an attribute on a simple element
-python3 fvinxml.py -f contrext.xml -p "ControllerExtensions/FileVersion" -a version
+python3 fvinxml.py -f contrext.xml \
+  -p "ControllerExtensions/FileVersion" -a version
 
 # Search when the root element itself carries the identifying attribute
 # (e.g. <BackgroundApplicationsFile id="CC"> as the document root)
-python3 fvinxml.py -f bcknames.xml -p "BackgroundApplicationsFile[@id='CC']/BackgroundApplication[@parameters='f:\fuel\bin\runfuel.bat']"
+python3 fvinxml.py -f bcknames.xml \
+  -p "BackgroundApplicationsFile[@id='CC']/BackgroundApplication[@parameters='f:\fuel\bin\runfuel.bat']"
 ```
+
+> **Quoting note:** Wrap the whole `-p` value in double quotes, as above. In bash, a backslash inside double quotes is only special before `$`, `` ` ``, `"`, `\`, or a newline — so path-like attribute values such as `f:\fuel\bin\runfuel.bat` pass through unchanged and do **not** need to be doubled (`\\`). Doubling would only be required in ANSI-C `$'...'` quoting or non-bash shells with different escaping rules.
+>
+> **From a Windows `.bat` file:** Windows argument parsing (`CommandLineToArgvW`) only treats a backslash as special when it's immediately followed by a `"` — otherwise it's literal, same as bash. So single backslashes in `f:\fuel\bin\runfuel.bat` still work unmodified inside double quotes:
+> ```bat
+> python fvinxml.py -f bcknames.xml -p "BackgroundApplicationsFile[@id='CC']/BackgroundApplication[@parameters='f:\fuel\bin\runfuel.bat']"
+> ```
+> Single quotes (`'`) aren't special to `cmd.exe`, so they don't need escaping either. The one `.bat`-specific gotcha: `%` is expanded by the batch parser, so if a path or attribute value ever contains a literal `%`, write it as `%%` inside a `.bat` script (not needed at an interactive `cmd` prompt).
 
 ### Set Values
 
