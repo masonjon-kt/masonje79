@@ -21,6 +21,11 @@ Options:
                           config/server/host         simple path
                           config/item[@name='foo']   attribute predicate
                           config/item[1]             index (1-based)
+                          root[@id='CC']/item        predicate on the root element itself;
+                                                      validated against the root's actual
+                                                      attribute (fails as not-found if it
+                                                      doesn't match), then the rest of the
+                                                      path is searched relative to root
     -a, --attribute   Attribute name to get/set/delete on the matched element
     -v, --value       Value to set on element text or attribute
     -c, --create      Create missing elements along the path if they don't exist
@@ -77,6 +82,10 @@ Examples:
   # Check if an attribute exists on a specific element and show its value:
   python3 ./fvinxml.py -f ./contrext.xml -p "ControllerExtensions/Controller[@id='FC']/Extensions/Extension[@suffix='ADXXTSJ8.DAT']" -a location
 
+  # Search when the root element itself carries the identifying attribute
+  # (e.g. <BackgroundApplicationsFile id="CC"> as the document root):
+  python3 ./fvinxml.py -f ./bcknames.xml -p "BackgroundApplicationsFile[@id='CC']/BackgroundApplication[@parameters='f:\fuel\bin\runfuel.bat']"
+
   # Check if any Extension exists under a Controller (finds first match):
   python3 ./fvinxml.py -f ./contrext.xml -p "ControllerExtensions/Controller[@id='FC']/Extensions/Extension"
 
@@ -120,8 +129,12 @@ def strip_root_tag(root, xpath):
     ElementTree.find() paths are relative to the element they're called on.
     If the user passes a full path like 'config/ext/some' and root is <config>,
     strip the leading 'config/' so the search is correctly relative to root.
-    Also handles the case where xpath == root.tag (referring to root itself).
+    Also handles the case where xpath == root.tag (referring to root itself),
+    and a predicate on the root segment, e.g. 'config[@id=\"CC\"]/ext', which is
+    validated against the root element's actual attributes rather than stripped blindly.
     """
+    import re as _re
+
     tag = root.tag
     if xpath == tag:
         return '.'
@@ -129,6 +142,20 @@ def strip_root_tag(root, xpath):
         stripped = xpath[len(tag) + 1:]
         dbg(f"Stripped root tag '{tag}' from path -> '{stripped}'")
         return stripped
+
+    m = _re.match(r"^" + _re.escape(tag) + r"\[@([\w\-\.]+)=(['\"])(.*?)\2\]"
+                  r"(?:/(.*))?$", xpath)
+    if m:
+        attr_name, _, attr_value, rest = m.groups()
+        if root.get(attr_name) != attr_value:
+            dbg(f"Root predicate mismatch: <{tag} {attr_name}='{root.get(attr_name)}'> "
+                f"does not match required '{attr_value}'")
+            return None
+        stripped = rest if rest is not None else '.'
+        dbg(f"Stripped root tag+predicate '{tag}[@{attr_name}=\"{attr_value}\"]' "
+            f"from path -> '{stripped}'")
+        return stripped
+
     return xpath
 
 
@@ -140,6 +167,10 @@ def find_or_create(tree_root, xpath, create):
     Returns the element, or None if not found and create=False.
     """
     xpath = strip_root_tag(tree_root, xpath)
+
+    if xpath is None:
+        dbg("Root predicate did not match; element not found")
+        return None
 
     if xpath == '.':
         dbg("xpath refers to root element itself")
@@ -411,7 +442,8 @@ def main():
 
     # --- Search only ---
     if args.search_only:
-        el = root.find(strip_root_tag(root, args.path))
+        stripped_path = strip_root_tag(root, args.path)
+        el = root.find(stripped_path) if stripped_path is not None else None
         if el is None:
             print(f"Not found: {args.path}")
             sys.exit(4)
@@ -428,6 +460,9 @@ def main():
     # --- Delete ---
     if args.delete:
         del_path = strip_root_tag(root, args.path)
+        if del_path is None:
+            err(f"Element not found at path: {args.path}")
+            sys.exit(4)
         deleted_count = 0
         if args.attribute:
             # Delete attribute from element
@@ -509,6 +544,9 @@ def main():
 
         # Find parent element at -p
         parent_path = strip_root_tag(root, args.path)
+        if parent_path is None:
+            err(f"Parent element not found: {args.path}")
+            sys.exit(4)
         if parent_path == '.':
             parent = root
         else:

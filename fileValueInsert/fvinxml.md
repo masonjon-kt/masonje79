@@ -32,9 +32,12 @@ All paths **must include the root element** as the first segment:
 RootElement/Child/Grandchild
 RootElement/Child[@attr='value']/Grandchild
 RootElement/Child[1]/Grandchild
+RootElement[@attr='value']/Child
 ```
 
 The root element in the path is validated against the document root. If they don't match, the command fails with a clear error.
+
+A predicate on the root segment itself (e.g. `RootElement[@id='CC']`) is validated against the root element's actual attributes — if the attribute value doesn't match, the search fails as not-found (exit 4) rather than being silently ignored.
 
 ---
 
@@ -97,6 +100,10 @@ python3 fvinxml.py -f contrext.xml \
 
 # Check an attribute on a simple element
 python3 fvinxml.py -f contrext.xml -p "ControllerExtensions/FileVersion" -a version
+
+# Search when the root element itself carries the identifying attribute
+# (e.g. <BackgroundApplicationsFile id="CC"> as the document root)
+python3 fvinxml.py -f bcknames.xml -p "BackgroundApplicationsFile[@id='CC']/BackgroundApplication[@parameters='f:\fuel\bin\runfuel.bat']"
 ```
 
 ### Set Values
