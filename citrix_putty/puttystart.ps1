@@ -28,6 +28,13 @@ param(
 
 $Verbose = $v.IsPresent
 
+function ConvertTo-PlainText {
+    param([System.Security.SecureString]$SecureString)
+
+    $credential = New-Object System.Management.Automation.PSCredential -ArgumentList 'unused', $SecureString
+    return $credential.GetNetworkCredential().Password
+}
+
 # Helper: prompt for credentials and return them
 function Request-Credentials {
     $u = Read-Host "Enter username [default: 4690]"
@@ -44,9 +51,7 @@ function Request-Password {
             Write-Host "Password cannot be empty. Please try again." -ForegroundColor Yellow
         }
     } while ($sp.Length -eq 0)
-    $p = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-        [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($sp)
-    )
+    $p = ConvertTo-PlainText $sp
     return @{ Password = $p; SecurePassword = $sp }
 }
 
@@ -643,9 +648,7 @@ if (Test-Path $configPath) {
         # Same day — decrypt and reuse stored password
         try {
             $SecurePassword = $cfg.PwdEncrypted | ConvertTo-SecureString
-            $Password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-                [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($SecurePassword)
-            )
+            $Password = ConvertTo-PlainText $SecurePassword
             Write-Host "Using saved credentials for $Username (saved today)." -ForegroundColor Green
         } catch {
             Write-Host "Could not decrypt saved password. Please re-enter credentials." -ForegroundColor Yellow
@@ -669,9 +672,7 @@ if (Test-Path $configPath) {
             try {
                 $sp = $cfg[$key] | ConvertTo-SecureString
                 $staticCreds[$store].SecurePassword = $sp
-                $staticCreds[$store].Password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-                    [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($sp)
-                )
+                $staticCreds[$store].Password = ConvertTo-PlainText $sp
             } catch {
                 Write-Host "Could not decrypt static credentials for store '$store'." -ForegroundColor Yellow
             }
@@ -847,9 +848,7 @@ while ($true) {
                         $staticSp = Read-Host "Enter static password for $storeKey" -AsSecureString
                         if ($staticSp.Length -eq 0) { Write-Host "Password cannot be empty." -ForegroundColor Yellow }
                     } while ($staticSp.Length -eq 0)
-                    $staticP = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-                        [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($staticSp)
-                    )
+                    $staticP = ConvertTo-PlainText $staticSp
                     $staticCreds[$storeKey] = @{ Username = $staticUser; Password = $staticP; SecurePassword = $staticSp }
                     Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds
                     Write-Host "Static credentials saved for $storeKey." -ForegroundColor Green
