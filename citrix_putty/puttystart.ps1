@@ -547,12 +547,40 @@ Windows Registry Editor Version 5.00
 "SSHManualHostKeys"=""
 "@
 
-$puttyRegFile = Join-Path $env:TEMP "puttystart_tcxSky.reg"
-$puttyRegContent | Set-Content -Path $puttyRegFile -Encoding Unicode
-$null = reg import $puttyRegFile 2>&1
+$puttySessionPath = 'HKCU:\Software\SimonTatham\PuTTY\Sessions\tcxSky'
+try {
+    $null = New-Item -Path $puttySessionPath -Force -ErrorAction Stop
+    foreach ($setting in ($puttyRegContent -split "`r?`n")) {
+        if ($setting -match '^"([^"]+)"=dword:([0-9a-fA-F]{8})$') {
+            $propertyName = $Matches[1]
+            $propertyValue = [int]::Parse($Matches[2], [System.Globalization.NumberStyles]::HexNumber)
+            $propertyType = 'DWord'
+        } elseif ($setting -match '^"([^"]+)"="(.*)"$') {
+            $propertyName = $Matches[1]
+            $propertyValue = $Matches[2].Replace('\"', '"').Replace('\\', '\')
+            $propertyType = 'String'
+        } elseif ($setting.StartsWith('"')) {
+            throw "Unsupported PuTTY registry setting: $setting"
+        } else {
+            continue
+        }
+        $null = New-ItemProperty -Path $puttySessionPath -Name $propertyName -Value $propertyValue -PropertyType $propertyType -Force -ErrorAction Stop
+    }
+} catch {
+    Write-Warning "Could not update PuTTY session settings: $($_.Exception.Message)"
+}
 
-# Config file in same directory as this script
-$configPath = Join-Path $PSScriptRoot "puttystart.cfg"
+# Config file in the current user's AppData folder
+if (-not $env:APPDATA) {
+    throw "APPDATA is not set. Cannot locate the per-user config folder."
+}
+$configDirectory = Join-Path $env:APPDATA "puttystart"
+$configPath = Join-Path $configDirectory "puttystart.cfg"
+$null = New-Item -Path $configDirectory -ItemType Directory -Force -ErrorAction Stop
+$legacyConfigPath = Join-Path $PSScriptRoot "puttystart.cfg"
+if (-not (Test-Path -LiteralPath $configPath) -and (Test-Path -LiteralPath $legacyConfigPath)) {
+    Copy-Item -LiteralPath $legacyConfigPath -Destination $configPath -ErrorAction Stop
+}
 
 # Helper: save all settings to config file
 function Save-Config {
