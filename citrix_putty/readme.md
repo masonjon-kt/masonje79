@@ -76,13 +76,15 @@ server01.example.com
 10.20.30.40
 ```
 
-For a normal store identifier such as `ci123`, the script builds a hostname using the current endpoint:
+For a bare store identifier such as `ci123`, the script always uses the `mc` endpoint, regardless of the saved endpoint:
 
 ```text
 mc.ci123.kroger.com
 ```
 
-Use `e` to change the endpoint from the default `mc` to another value such as `cc` or `fc`.
+To connect through another endpoint, enter it explicitly with the store, such as `cc.ci123`.
+
+When a previous store is available, enter a two-letter endpoint code to connect to that same store through a different endpoint. For example, with `ci123` as the previous store, entering `cc` connects to `cc.ci123.kroger.com`. Prefix the code with a tool command to launch only that tool, such as `w cc` for WinSCP.
 
 ## Store Commands
 

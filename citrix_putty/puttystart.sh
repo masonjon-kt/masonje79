@@ -141,6 +141,11 @@ load_config() {
         esac
     done < "$CONFIG_PATH"
 
+    if [[ "$lastStore" =~ ^([a-zA-Z]{2,})\.([a-zA-Z]{2}[0-9]{3})$ ]]; then
+        lastEnvironment="${BASH_REMATCH[1],,}"
+        lastStore="${BASH_REMATCH[2]}"
+    fi
+
     if [[ "$ftChoiceVersion" != "2" ]]; then
         case "$savedFtChoice" in
             1) savedFtChoice="0" ;;
@@ -285,8 +290,8 @@ while true; do
         say $'\n--- New Connection ---' "$C_CYAN"
         say "  Endpoint: $lastEnvironment  |  'u' = usage  |  'x' = exit" "$C_GRAY"
 
-        storePrompt="Store (e.g., ci123 / fc.ci123 / FQDN / IP)"
-        [[ -n "$lastStore" ]] && storePrompt+=" [default: $lastStore]"
+        storePrompt="Store (e.g., ci123 / fc.ci123 / cc / FQDN / IP)"
+        [[ -n "$lastStore" ]] && storePrompt+=" [default: $lastEnvironment.$lastStore]"
         read -rp "$storePrompt: " storeInput < /dev/tty
         storeInput="${storeInput#"${storeInput%%[![:space:]]*}"}"
         storeInput="${storeInput%"${storeInput##*[![:space:]]}"}"
@@ -390,18 +395,31 @@ while true; do
             continue
         fi
 
-        Store="$storeInput"
-        if [[ -z "$Store" ]]; then
-            if [[ -n "$lastStore" ]]; then
-                Store="$lastStore"
-            else
-                warn "Store number cannot be empty. Please try again."
-                continue
+        if [[ "$storeInput" =~ ^([a-zA-Z]{2,})\.([a-zA-Z]{2}[0-9]{3})$ ]]; then
+            Store="${BASH_REMATCH[2]}"
+            Environment="${BASH_REMATCH[1],,}"
+            lastStore="$Store"
+            lastEnvironment="$Environment"
+        elif [[ -n "$lastStore" && "$storeInput" =~ ^[a-zA-Z]{2}$ ]]; then
+            Store="$lastStore"
+            Environment="${storeInput,,}"
+        else
+            Environment="$lastEnvironment"
+            Store="$storeInput"
+            if [[ -z "$Store" ]]; then
+                if [[ -n "$lastStore" ]]; then
+                    Store="$lastStore"
+                else
+                    warn "Store number cannot be empty. Please try again."
+                    continue
+                fi
             fi
+            if [[ "$storeInput" =~ ^[a-zA-Z]{2}[0-9]{3}$ ]]; then
+                Environment="mc"
+                lastEnvironment="$Environment"
+            fi
+            lastStore="$Store"
         fi
-
-        lastStore="$Store"
-        Environment="$lastEnvironment"
 
         launchSsh=$useSsh
         launchSftp=$useSftp

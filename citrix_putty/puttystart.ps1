@@ -641,6 +641,10 @@ if (Test-Path $configPath) {
     if ($cfg.Username)            { $Username         = $cfg.Username }
     if ($cfg.LastStore)           { $lastStore        = $cfg.LastStore }
     if ($cfg.LastEnvironment)     { $lastEnvironment  = $cfg.LastEnvironment }
+    if ($lastStore -match '^([a-zA-Z]{2,})\.([a-zA-Z]{2}\d{3})$') {
+        $lastEnvironment = $Matches[1].ToLower()
+        $lastStore = $Matches[2]
+    }
     if ($cfg.TinyTermTemplate)    { $TinyTermTemplate = $cfg.TinyTermTemplate }
     # Command-line -Port takes precedence; fall back to config, then default 22
     if (-not $Port) {
@@ -779,8 +783,8 @@ while ($true) {
     Write-Host "  Endpoint: $lastEnvironment  |  'u' = usage  |  'x' = exit" -ForegroundColor DarkGray
 
     # Prompt for store (accepts special commands)
-    $storePrompt = "Store (e.g., ci123 / fc.ci123 / FQDN / IP)"
-    if ($lastStore) { $storePrompt += " [default: $lastStore]" }
+    $storePrompt = "Store (e.g., ci123 / fc.ci123 / cc / FQDN / IP)"
+    if ($lastStore) { $storePrompt += " [default: $lastEnvironment.$lastStore]" }
 
     $storeInput = (Read-Host $storePrompt).Trim()
 
@@ -891,18 +895,31 @@ while ($true) {
         continue
     }
 
-    $Store = $storeInput
-    if (-not $Store) {
-        if ($lastStore) {
-            $Store = $lastStore
-        } else {
-            Write-Host "Store number cannot be empty. Please try again." -ForegroundColor Yellow
-            continue
+    if ($storeInput -match '^([a-zA-Z]{2,})\.([a-zA-Z]{2}\d{3})$') {
+        $Store = $Matches[2]
+        $Environment = $Matches[1].ToLower()
+        $lastStore = $Store
+        $lastEnvironment = $Environment
+    } elseif ($lastStore -and $storeInput -match '^[a-zA-Z]{2}$') {
+        $Store = $lastStore
+        $Environment = $storeInput.ToLower()
+    } else {
+        $Environment = $lastEnvironment
+        $Store = $storeInput
+        if (-not $Store) {
+            if ($lastStore) {
+                $Store = $lastStore
+            } else {
+                Write-Host "Store number cannot be empty. Please try again." -ForegroundColor Yellow
+                continue
+            }
         }
+        if ($storeInput -match '^[a-zA-Z]{2}\d{3}$') {
+            $Environment = "mc"
+            $lastEnvironment = $Environment
+        }
+        $lastStore = $Store
     }
-
-    $lastStore = $Store
-    $Environment = $lastEnvironment
 
     $launchPutty = $usePutty
     $launchTinyTerm = $useTinyTerm
