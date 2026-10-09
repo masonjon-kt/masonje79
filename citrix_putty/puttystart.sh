@@ -454,8 +454,22 @@ while true; do
 
         save_config
 
+        # Tuna endpoint passes the current user ID only (no password); sftp is not supported
+        noCreds=0
+        if [[ "$Environment" == "tuna" || "$TargetHost" == tuna.* ]]; then
+            noCreds=1
+            if [[ $launchSftp -eq 1 ]]; then
+                warn "sftp is not supported for tuna - skipping."
+                launchSftp=0
+            fi
+        fi
+
         storeKey="${Store,,}"
-        if [[ -n "${STATIC_PASS[$storeKey]:-}" ]]; then
+        if [[ $noCreds -eq 1 ]]; then
+            ConnUsername="$(id -un)"; ConnUsername="${ConnUsername,,}"
+            ConnPassword=""
+            say "Connecting to: $TargetHost as $ConnUsername  [USER ID only - tuna]" "$C_GREEN"
+        elif [[ -n "${STATIC_PASS[$storeKey]:-}" ]]; then
             ConnUsername="${STATIC_USER[$storeKey]}"
             ConnPassword="${STATIC_PASS[$storeKey]}"
             say "Connecting to: $TargetHost as $ConnUsername  [STATIC credentials]" "$C_GREEN"
@@ -465,17 +479,24 @@ while true; do
             say "Connecting to: $TargetHost as $ConnUsername  [PWD credentials]" "$C_GREEN"
         fi
 
-        if copy_to_clipboard "$ConnPassword"; then
+        if [[ $noCreds -eq 0 ]] && copy_to_clipboard "$ConnPassword"; then
             say "Password copied to clipboard." "$C_GREEN"
         fi
 
         if [[ $launchSsh -eq 1 ]]; then
             say "Launching ssh in a new terminal..." "$C_CYAN"
-            [[ $Verbose -eq 1 ]] && say "  CMD: ssh -p $Port $ConnUsername@$TargetHost (password via SSHPASS)" "$C_DKYELLOW"
-            sshCmd="$(printf 'ssh -p %q -o StrictHostKeyChecking=accept-new -o PubkeyAuthentication=no %q' \
-                "$Port" "$ConnUsername@$TargetHost")"
-            [[ -n "$SSHPASS_BIN" ]] && sshCmd="$(printf '%q -e ' "$SSHPASS_BIN")$sshCmd"
-            SSHPASS="$ConnPassword" run_in_new_terminal "$ConnUsername@$TargetHost" "$sshCmd"
+            if [[ $noCreds -eq 1 ]]; then
+                [[ $Verbose -eq 1 ]] && say "  CMD: ssh -p $Port $ConnUsername@$TargetHost" "$C_DKYELLOW"
+                sshCmd="$(printf 'ssh -p %q -o StrictHostKeyChecking=accept-new %q' \
+                    "$Port" "$ConnUsername@$TargetHost")"
+                run_in_new_terminal "$ConnUsername@$TargetHost" "$sshCmd"
+            else
+                [[ $Verbose -eq 1 ]] && say "  CMD: ssh -p $Port $ConnUsername@$TargetHost (password via SSHPASS)" "$C_DKYELLOW"
+                sshCmd="$(printf 'ssh -p %q -o StrictHostKeyChecking=accept-new -o PubkeyAuthentication=no %q' \
+                    "$Port" "$ConnUsername@$TargetHost")"
+                [[ -n "$SSHPASS_BIN" ]] && sshCmd="$(printf '%q -e ' "$SSHPASS_BIN")$sshCmd"
+                SSHPASS="$ConnPassword" run_in_new_terminal "$ConnUsername@$TargetHost" "$sshCmd"
+            fi
         fi
 
         if [[ $launchSftp -eq 1 ]]; then
