@@ -86,6 +86,15 @@ To connect through another endpoint, enter it explicitly with the store, such as
 
 When a previous store is available, enter a two-letter endpoint code to connect to that same store through a different endpoint. For example, with `ci123` as the previous store, entering `cc` connects to `cc.ci123.kroger.com`. This shorthand does not change the saved default. Prefix the code with a tool command to launch only that tool, such as `w cc` for WinSCP.
 
+### Tuna Endpoint
+
+The `tuna` endpoint, such as `tuna.ci123` (resolves to `tuna.ci123.kroger.com`), connects without credentials:
+
+- No username or password is sent, and nothing is copied to the clipboard.
+- PuTTY launches without the `tcxSky` profile (`putty -ssh <host> -P <port>`).
+- TinyTerm launches with its auto-login disabled.
+- WinSCP is not supported for tuna and is skipped with a warning.
+
 ## Store Commands
 
 The prompt displays only the most commonly needed commands:
@@ -243,6 +252,7 @@ x
 ## Change Log
 
 ### 2026-10
+- Added `tuna` endpoint support: connects without credentials or the `tcxSky` profile, and skips WinSCP.
 - Config management and registry update method.
 - Moved Marshal handling to PSCredential.
 - Character fixes.
