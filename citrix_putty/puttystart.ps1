@@ -17,7 +17,7 @@
 #
 # Examples:
 #   .\puttystart.ps1                 # Normal run, defaults to port 22
-#   .\puttystart.ps1 -v              # Verbose — shows launch commands
+#   .\puttystart.ps1 -v              # Verbose - shows launch commands
 #   .\puttystart.ps1 -Port 2222      # Connect on a non-standard SSH port
 #   Store prompt: p mc.ci123         # Launch only PuTTY for this host
 
@@ -82,13 +82,11 @@ if (-not (Test-Path $tinytermPath)) {
     $tinytermPath = "C:\Program Files (x86)\Century\TinyTERM\tt.exe"
 }
 
-if (-not $Port) { $Port = "22" }
-$SftpPort = $Port
 $lastEnvironment = "mc"
 $lastStore = ""
 $staticCreds = @{}  # key: store (lowercase), value: @{Username; Password; SecurePassword}
 
-# Built-in TinyTerm .emu template — written to temp at startup
+# Built-in TinyTerm .emu template - written to temp at startup
 $builtInEmuTemplate = @"
 [Application]
 SaveOnExit=0
@@ -645,7 +643,7 @@ if (Test-Path $configPath) {
         else                      { $Port = "22" }
     }
     if ($cfg.PwdEncrypted -and $cfg.PwdDate -eq $today) {
-        # Same day — decrypt and reuse stored password
+        # Same day - decrypt and reuse stored password
         try {
             $SecurePassword = $cfg.PwdEncrypted | ConvertTo-SecureString
             $Password = ConvertTo-PlainText $SecurePassword
@@ -679,6 +677,9 @@ if (Test-Path $configPath) {
         }
     }
 }
+
+if (-not $Port) { $Port = "22" }
+$SftpPort = $Port
 
 # Prompt for credentials if not loaded from config
 if (-not $Password) {
@@ -739,10 +740,10 @@ while ($true) {
 
         $savedTermChoice = $termChoice
         $savedFtChoice   = $ftChoice
-        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
+        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
 
         # --- Verbose toggle ---
-        $verboseToggle = Read-Host "Verbose mode (shows launch commands) [current: $(if($Verbose){'ON'}else{'OFF'})] — press Enter to keep, or type 'on'/'off' to change"
+        $verboseToggle = Read-Host "Verbose mode (shows launch commands) [current: $(if($Verbose){'ON'}else{'OFF'})] - press Enter to keep, or type 'on'/'off' to change"
         if ($verboseToggle -eq 'on')  { $Verbose = $true  }
         if ($verboseToggle -eq 'off') { $Verbose = $false }
     }
@@ -828,7 +829,7 @@ while ($true) {
                 $Username       = $creds.Username
                 $Password       = $creds.Password
                 $SecurePassword = $creds.SecurePassword
-                Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds
+                Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
                 Write-Host "Daily credentials updated." -ForegroundColor Green
             }
             "2" {
@@ -850,7 +851,7 @@ while ($true) {
                     } while ($staticSp.Length -eq 0)
                     $staticP = ConvertTo-PlainText $staticSp
                     $staticCreds[$storeKey] = @{ Username = $staticUser; Password = $staticP; SecurePassword = $staticSp }
-                    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds
+                    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
                     Write-Host "Static credentials saved for $storeKey." -ForegroundColor Green
                 }
             }
@@ -858,7 +859,7 @@ while ($true) {
                 $storeKey = (Read-Host "Enter store number to remove").ToLower()
                 if ($staticCreds.ContainsKey($storeKey)) {
                     $staticCreds.Remove($storeKey)
-                    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds
+                    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
                     Write-Host "Static credentials removed for $storeKey." -ForegroundColor Green
                 } else {
                     Write-Host "No static credentials found for '$storeKey'." -ForegroundColor Yellow
@@ -883,7 +884,7 @@ while ($true) {
     if ($storeInput -eq "e") {
         $newEnv = Read-Host "Enter endpoint (mc, cc, fc, etc.) [default: $lastEnvironment]"
         if ($newEnv) { $lastEnvironment = $newEnv }
-        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds
+        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
         continue
     }
 
@@ -932,11 +933,11 @@ while ($true) {
         $TargetHost = "$Store.kroger.com"
     } else {
         $TargetHost = $Store
-        Write-Host "Non-standard entry — connecting directly to: $TargetHost" -ForegroundColor DarkYellow
+        Write-Host "Non-standard entry - connecting directly to: $TargetHost" -ForegroundColor DarkYellow
     }
 
     # Save last store and endpoint to config
-    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds
+    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
 
     # Resolve credentials: static per-store overrides daily PWD
     $storeKey = $Store.ToLower()
