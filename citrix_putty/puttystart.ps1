@@ -960,7 +960,7 @@ while ($true) {
     # Save last store and endpoint to config
     Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
 
-    # Tuna endpoint does not use credentials or the tcxSky profile
+    # Tuna endpoint passes the current Windows user ID only (no password) and does not use the tcxSky profile
     $noCreds = ($Environment -eq "tuna") -or ($TargetHost -like "tuna.*")
     if ($noCreds -and $launchWinSCP) {
         Write-Host "WinSCP is not supported for tuna - skipping." -ForegroundColor Yellow
@@ -970,9 +970,9 @@ while ($true) {
     # Resolve credentials: static per-store overrides daily PWD
     $storeKey = $Store.ToLower()
     if ($noCreds) {
-        $ConnUsername = ""
+        $ConnUsername = $env:USERNAME.ToLower()
         $ConnPassword = ""
-        Write-Host "Connecting to: $TargetHost  [NO credentials - tuna]" -ForegroundColor Green
+        Write-Host "Connecting to: $TargetHost as $ConnUsername  [USER ID only - tuna]" -ForegroundColor Green
     } elseif ($staticCreds.ContainsKey($storeKey) -and $staticCreds[$storeKey].Password) {
         $ConnUsername = $staticCreds[$storeKey].Username
         $ConnPassword = $staticCreds[$storeKey].Password
@@ -993,8 +993,8 @@ while ($true) {
     if ($launchPutty) {
         Write-Host "Launching PuTTY..." -ForegroundColor Cyan
         if ($noCreds) {
-            if ($Verbose) { Write-Host "  CMD: `"$puttyPath`" -ssh $TargetHost -P $Port" -ForegroundColor DarkYellow }
-            & $puttyPath -ssh $TargetHost -P $Port
+            if ($Verbose) { Write-Host "  CMD: `"$puttyPath`" -ssh $ConnUsername@$TargetHost -P $Port" -ForegroundColor DarkYellow }
+            & $puttyPath -ssh "$ConnUsername@$TargetHost" -P $Port
         } else {
             if ($Verbose) { Write-Host "  CMD: `"$puttyPath`" -load tcxSky -ssh $ConnUsername@$TargetHost -P $Port -pw *****" -ForegroundColor DarkYellow }
             & $puttyPath -load "tcxSky" -ssh "$ConnUsername@$TargetHost" -P $Port -pw $ConnPassword
