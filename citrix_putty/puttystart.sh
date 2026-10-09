@@ -17,7 +17,7 @@
 #   c                 Open credential management menu (update daily PWD, static creds)
 #   e                 Change the current endpoint (mc, cc, fc, etc.)
 #   x                 Exit
-#   s|f|w [<host>]    Launch ssh / FileZilla / sftp for one host
+#   s|w [<host>]    Launch ssh / sftp for one host
 #
 # Examples:
 #   ./puttystart.sh              # Normal run, defaults to port 22
@@ -54,7 +54,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ------------------------------------------------------------ tool discovery --
-FILEZILLA_BIN="$(command -v filezilla || true)"
 SSH_BIN="$(command -v ssh || true)"
 SFTP_BIN="$(command -v sftp || true)"
 SSHPASS_BIN="$(command -v sshpass || true)"
@@ -100,6 +99,7 @@ save_config() {
     {
         printf 'TermChoice=%s\n'      "$savedTermChoice"
         printf 'FtChoice=%s\n'        "$savedFtChoice"
+        printf 'FtChoiceVersion=2\n'
         printf 'Port=%s\n'            "$Port"
         printf 'Username=%s\n'        "$Username"
         printf 'PwdEncoded=%s\n'      "$(obfuscate "$Password")"
@@ -118,13 +118,14 @@ save_config() {
 
 load_config() {
     [[ -f "$CONFIG_PATH" ]] || return 0
-    local key value pwdEncoded="" cfgPort="" store
+    local key value pwdEncoded="" cfgPort="" ftChoiceVersion="" store
     while IFS= read -r line; do
         [[ -z "$line" || "$line" == \#* || "$line" != *=* ]] && continue
         key="${line%%=*}"; value="${line#*=}"
         case "$key" in
             TermChoice)      savedTermChoice="$value" ;;
             FtChoice)        savedFtChoice="$value" ;;
+            FtChoiceVersion) ftChoiceVersion="$value" ;;
             Port)            cfgPort="$value" ;;
             Username)        Username="$value" ;;
             LastStore)       lastStore="$value" ;;
@@ -139,6 +140,13 @@ load_config() {
                 STATIC_PASS["${store,,}"]="$(deobfuscate "$value")" ;;
         esac
     done < "$CONFIG_PATH"
+
+    if [[ "$ftChoiceVersion" != "2" ]]; then
+        case "$savedFtChoice" in
+            1) savedFtChoice="0" ;;
+            2) savedFtChoice="1" ;;
+        esac
+    fi
 
     # Command-line port takes precedence; fall back to config, then default 22
     [[ -z "$Port" ]] && Port="${cfgPort:-}"
@@ -237,8 +245,8 @@ while true; do
         termChoice="${termChoice:-$savedTermChoice}"
 
         say $'\nFile transfer session:' "$C_CYAN"
-        say "0. None"; say "1. FileZilla"; say "2. sftp (native)"
-        read -rp "Select file transfer (0-2) [default: $savedFtChoice]: " ftChoice < /dev/tty
+        say "0. None"; say "1. sftp (native)"
+        read -rp "Select file transfer (0-1) [default: $savedFtChoice]: " ftChoice < /dev/tty
         ftChoice="${ftChoice:-$savedFtChoice}"
 
         read -rp "SSH/SFTP port [default: $Port]: " newPort < /dev/tty
@@ -255,23 +263,19 @@ while true; do
         [[ "$vt" == "off" ]] && Verbose=0
     fi
 
-    useSsh=0; useFilezilla=0; useSftp=0
+    useSsh=0; useSftp=0
     [[ "$termChoice" == "1" ]] && useSsh=1
-    [[ "$ftChoice"   == "1" ]] && useFilezilla=1
-    [[ "$ftChoice"   == "2" ]] && useSftp=1
+    [[ "$ftChoice"   == "1" ]] && useSftp=1
 
     if [[ $useSsh -eq 1 && -z "$SSH_BIN" ]]; then
         warn "ssh not found. Terminal will not be launched."; useSsh=0
-    fi
-    if [[ $useFilezilla -eq 1 && -z "$FILEZILLA_BIN" ]]; then
-        warn "FileZilla not found. File transfer will not be launched."; useFilezilla=0
     fi
     if [[ $useSftp -eq 1 && -z "$SFTP_BIN" ]]; then
         warn "sftp not found. File transfer will not be launched."; useSftp=0
     fi
 
     termName="None"; [[ $useSsh -eq 1 ]] && termName="ssh"
-    ftName="None";   [[ $useFilezilla -eq 1 ]] && ftName="FileZilla"; [[ $useSftp -eq 1 ]] && ftName="sftp"
+    ftName="None";   [[ $useSftp -eq 1 ]] && ftName="sftp"
     vState=$([[ $Verbose -eq 1 ]] && echo ON || echo OFF)
     say $'\n'"Active: Terminal=$termName  FileTransfer=$ftName  Port=$Port  Verbose=$vState" "$C_DKCYAN"
 
@@ -290,7 +294,6 @@ while true; do
         if [[ "$storeInput" == "u" ]]; then
             say $'\nStore commands:' "$C_CYAN"
             say "  s <host>  Launch ssh"
-            say "  f <host>  Launch FileZilla"
             say "  w <host>  Launch sftp"
             say "  t         Change tools"
             say "  c         Credential management"
@@ -301,8 +304,13 @@ while true; do
         if [[ "$storeInput" == "t" ]]; then backToTools=1; break; fi
         if [[ "$storeInput" == "x" ]]; then exit 0; fi
 
+        if [[ "$storeInput" =~ ^f([[:space:]]|$) ]]; then
+            warn "Unsupported tool command. Enter 'u' to see available commands."
+            continue
+        fi
+
         singleTool=""
-        if [[ "$storeInput" =~ ^(s|f|w)([[:space:]]+(.+))?$ ]]; then
+        if [[ "$storeInput" =~ ^(s|w)([[:space:]]+(.+))?$ ]]; then
             singleTool="${BASH_REMATCH[1]}"
             if [[ -n "${BASH_REMATCH[3]:-}" ]]; then
                 storeInput="${BASH_REMATCH[3]}"
@@ -396,12 +404,11 @@ while true; do
         Environment="$lastEnvironment"
 
         launchSsh=$useSsh
-        launchFilezilla=$useFilezilla; launchSftp=$useSftp
+        launchSftp=$useSftp
         if [[ -n "$singleTool" ]]; then
-            launchSsh=0; launchFilezilla=0; launchSftp=0
+            launchSsh=0; launchSftp=0
             case "$singleTool" in
                 s) launchSsh=1;       requestedBin="$SSH_BIN" ;;
-                f) launchFilezilla=1; requestedBin="$FILEZILLA_BIN" ;;
                 w) launchSftp=1;      requestedBin="$SFTP_BIN" ;;
             esac
             if [[ -z "$requestedBin" ]]; then
@@ -449,12 +456,6 @@ while true; do
             SSHPASS="$ConnPassword" run_in_new_terminal "$ConnUsername@$TargetHost" "$sshCmd"
         fi
 
-        if [[ $launchFilezilla -eq 1 ]]; then
-            say "Launching FileZilla..." "$C_CYAN"
-            [[ $Verbose -eq 1 ]] && say "  CMD: $FILEZILLA_BIN sftp://$ConnUsername:*****@$TargetHost:$SftpPort" "$C_DKYELLOW"
-            launch_bg "$FILEZILLA_BIN" "sftp://$ConnUsername:$ConnPassword@$TargetHost:$SftpPort"
-        fi
-
         if [[ $launchSftp -eq 1 ]]; then
             say "Launching sftp..." "$C_CYAN"
             [[ $Verbose -eq 1 ]] && say "  CMD: sftp -P $SftpPort $ConnUsername@$TargetHost (password via SSHPASS)" "$C_DKYELLOW"
@@ -463,7 +464,7 @@ while true; do
                 "$ConnUsername@$TargetHost"
         fi
 
-        if [[ $launchSsh -eq 1 || $launchFilezilla -eq 1 || $launchSftp -eq 1 ]]; then
+        if [[ $launchSsh -eq 1 || $launchSftp -eq 1 ]]; then
             warn "Session(s) closed. Ready for next connection."
         fi
     done

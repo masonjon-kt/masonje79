@@ -13,7 +13,7 @@
 #   t   Open tool selection menu (change terminal / file transfer app)
 #   c   Open credential management menu (update daily PWD, manage static creds)
 #   e   Change the current endpoint (mc, cc, fc, etc.)
-#   p/t/f/w [<host>]  Launch PuTTY/TinyTerm/FileZilla/WinSCP for one host
+#   p/t/w [<host>]  Launch PuTTY/TinyTerm/WinSCP for one host
 #
 # Examples:
 #   .\puttystart.ps1                 # Normal run, defaults to port 22
@@ -62,12 +62,6 @@ if (-not (Test-Path $puttyPath)) {
 }
 if (-not (Test-Path $puttyPath)) {
     Write-Host "PuTTY not found. PuTTY will not be available as a terminal option." -ForegroundColor Yellow
-}
-
-# Check if FileZilla is installed
-$filezillaPath = "C:\Program Files\FileZilla FTP Client\filezilla.exe"
-if (-not (Test-Path $filezillaPath)) {
-    $filezillaPath = "C:\Program Files (x86)\FileZilla FTP Client\filezilla.exe"
 }
 
 # Check if WinSCP is installed
@@ -593,6 +587,7 @@ function Save-Config {
     $lines = @(
         "TermChoice=$termChoice",
         "FtChoice=$ftChoice",
+        "FtChoiceVersion=2",
         "Port=$port",
         "TinyTermTemplate=$tinyTermTemplate",
         "Username=$username",
@@ -632,7 +627,17 @@ $today = (Get-Date).ToString("yyyy-MM-dd")
 if (Test-Path $configPath) {
     $cfg = (Get-Content $configPath -Raw) -replace '\\', '\\\\' | ConvertFrom-StringData
     if ($cfg.TermChoice)          { $savedTermChoice  = $cfg.TermChoice }
-    if ($cfg.FtChoice)            { $savedFtChoice    = $cfg.FtChoice }
+    if ($cfg.FtChoice) {
+        if ($cfg.FtChoiceVersion -eq "2") {
+            $savedFtChoice = $cfg.FtChoice
+        } else {
+            $savedFtChoice = switch ($cfg.FtChoice) {
+                "1" { "0" }
+                "2" { "1" }
+                default { $cfg.FtChoice }
+            }
+        }
+    }
     if ($cfg.Username)            { $Username         = $cfg.Username }
     if ($cfg.LastStore)           { $lastStore        = $cfg.LastStore }
     if ($cfg.LastEnvironment)     { $lastEnvironment  = $cfg.LastEnvironment }
@@ -716,10 +721,9 @@ while ($true) {
         # --- File transfer selection ---
         Write-Host "`nFile transfer session:" -ForegroundColor Cyan
         Write-Host "0. None" -ForegroundColor White
-        Write-Host "1. FileZilla" -ForegroundColor White
-        Write-Host "2. WinSCP" -ForegroundColor White
+        Write-Host "1. WinSCP" -ForegroundColor White
 
-        $ftChoice = Read-Host "Select file transfer (0-2) [default: $savedFtChoice]"
+        $ftChoice = Read-Host "Select file transfer (0-1) [default: $savedFtChoice]"
         if (-not $ftChoice) { $ftChoice = $savedFtChoice }
 
         # --- Port configuration ---
@@ -751,8 +755,7 @@ while ($true) {
     # Apply tool flags from chosen values
     $usePutty    = ($termChoice -eq "1")
     $useTinyTerm = ($termChoice -eq "2")
-    $useFilezilla = ($ftChoice -eq "1")
-    $useWinSCP    = ($ftChoice -eq "2")
+    $useWinSCP    = ($ftChoice -eq "1")
 
     if ($usePutty -and -not (Test-Path $puttyPath)) {
         Write-Host "PuTTY not found. Terminal will not be launched." -ForegroundColor Yellow
@@ -762,17 +765,13 @@ while ($true) {
         Write-Host "TinyTerm not found at expected locations. Terminal will not be launched." -ForegroundColor Yellow
         $useTinyTerm = $false
     }
-    if ($useFilezilla -and -not (Test-Path $filezillaPath)) {
-        Write-Host "FileZilla not found at expected locations. File transfer will not be launched." -ForegroundColor Yellow
-        $useFilezilla = $false
-    }
     if ($useWinSCP -and -not (Test-Path $winscpPath)) {
         Write-Host "WinSCP not found at expected locations. File transfer will not be launched." -ForegroundColor Yellow
         Write-Host "WinSCP can be downloaded from https://winscp.net" -ForegroundColor Yellow
         $useWinSCP = $false
     }
 
-    Write-Host "`nActive: Terminal=$(if($usePutty){'PuTTY'}elseif($useTinyTerm){'TinyTerm'}else{'None'})  FileTransfer=$(if($useFilezilla){'FileZilla'}elseif($useWinSCP){'WinSCP'}else{'None'})  Port=$Port  Verbose=$(if($Verbose){'ON'}else{'OFF'})" -ForegroundColor DarkCyan
+    Write-Host "`nActive: Terminal=$(if($usePutty){'PuTTY'}elseif($useTinyTerm){'TinyTerm'}else{'None'})  FileTransfer=$(if($useWinSCP){'WinSCP'}else{'None'})  Port=$Port  Verbose=$(if($Verbose){'ON'}else{'OFF'})" -ForegroundColor DarkCyan
 
 # Main connection loop
 while ($true) {
@@ -789,7 +788,6 @@ while ($true) {
         Write-Host "`nStore commands:" -ForegroundColor Cyan
         Write-Host "  p <host>  Launch PuTTY" -ForegroundColor White
         Write-Host "  t <host>  Launch TinyTerm" -ForegroundColor White
-        Write-Host "  f <host>  Launch FileZilla" -ForegroundColor White
         Write-Host "  w <host>  Launch WinSCP" -ForegroundColor White
         Write-Host "  t         Change tools" -ForegroundColor White
         Write-Host "  c         Credential management" -ForegroundColor White
@@ -800,8 +798,13 @@ while ($true) {
     if ($storeInput -eq "t") { break }
     if ($storeInput -eq "x") { exit 0 }
 
+    if ($storeInput -match '^f(?:\s|$)') {
+        Write-Host "Unsupported tool command. Enter 'u' to see available commands." -ForegroundColor Yellow
+        continue
+    }
+
     $singleTool = $null
-    if ($storeInput -match '^(p|t|f|w)(?:\s+(.+))?$') {
+    if ($storeInput -match '^(p|t|w)(?:\s+(.+))?$') {
         $singleTool = $Matches[1].ToLower()
         if ($Matches[2]) {
             $storeInput = $Matches[2].Trim()
@@ -903,18 +906,15 @@ while ($true) {
 
     $launchPutty = $usePutty
     $launchTinyTerm = $useTinyTerm
-    $launchFilezilla = $useFilezilla
     $launchWinSCP = $useWinSCP
     if ($singleTool) {
         $launchPutty = ($singleTool -eq "p")
         $launchTinyTerm = ($singleTool -eq "t")
-        $launchFilezilla = ($singleTool -eq "f")
         $launchWinSCP = ($singleTool -eq "w")
 
         $requestedToolPath = switch ($singleTool) {
             "p" { $puttyPath }
             "t" { $tinytermPath }
-            "f" { $filezillaPath }
             "w" { $winscpPath }
         }
         if (-not (Test-Path $requestedToolPath)) {
@@ -994,13 +994,6 @@ while ($true) {
         }
     }
 
-    # Launch FileZilla if selected
-    if ($launchFilezilla) {
-        Write-Host "Launching FileZilla..." -ForegroundColor Cyan
-        if ($Verbose) { Write-Host "  CMD: `"$filezillaPath`" sftp://$ConnUsername`:*****@${TargetHost}:$SftpPort" -ForegroundColor DarkYellow }
-        & $filezillaPath "sftp://$ConnUsername`:$ConnPassword@${TargetHost}:$SftpPort"
-    }
-
     # Launch WinSCP if selected
     if ($launchWinSCP) {
         Write-Host "Launching WinSCP..." -ForegroundColor Cyan
@@ -1008,7 +1001,7 @@ while ($true) {
         & $winscpPath "sftp://$ConnUsername`:$ConnPassword@${TargetHost}:$SftpPort"
     }
     
-    if ($launchPutty -or $launchTinyTerm -or $launchFilezilla -or $launchWinSCP) {
+    if ($launchPutty -or $launchTinyTerm -or $launchWinSCP) {
         Write-Host "Session(s) closed. Ready for next connection." -ForegroundColor Yellow
     }
 }

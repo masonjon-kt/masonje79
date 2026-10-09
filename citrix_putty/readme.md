@@ -1,6 +1,6 @@
 # PuTTY Environment Launcher
 
-`puttystart.ps1` is an interactive PowerShell launcher for connecting to Kroger environments with PuTTY, TinyTerm, FileZilla, and WinSCP.
+`puttystart.ps1` is an interactive PowerShell launcher for connecting to Kroger environments with PuTTY, TinyTerm, and WinSCP.
 
 ## Requirements
 
@@ -8,7 +8,6 @@
 - One or more supported tools installed:
   - PuTTY
   - TinyTerm
-  - FileZilla
   - WinSCP
 - Permission to run PowerShell scripts
 
@@ -57,7 +56,7 @@ On the first connection, the script uses the saved terminal and file-transfer se
 The tool-selection menu contains:
 
 - Terminal: None, PuTTY, or TinyTerm
-- File transfer: None, FileZilla, or WinSCP
+- File transfer: None or WinSCP
 - SSH/SFTP port
 - TinyTerm template path when TinyTerm is selected
 - Verbose mode
@@ -99,7 +98,6 @@ Enter `u` to display the complete command menu:
 ```text
 p <host>  Launch PuTTY
 t <host>  Launch TinyTerm
-f <host>  Launch FileZilla
 w <host>  Launch WinSCP
 t         Change tools
 c         Credential management
@@ -114,7 +112,6 @@ Use a tool letter followed by a space and the target host:
 ```text
 p mc.ci123
 t server01.example.com
-f 10.20.30.40
 w host.example.com
 ```
 
@@ -122,7 +119,6 @@ The commands are:
 
 - `p <host>` launches PuTTY only
 - `t <host>` launches TinyTerm only
-- `f <host>` launches FileZilla only
 - `w <host>` launches WinSCP only
 
 The host is optional. When it is omitted, the command uses the last store or host entered:
@@ -130,7 +126,6 @@ The host is optional. When it is omitted, the command uses the last store or hos
 ```text
 p
 t
-f
 w
 ```
 
