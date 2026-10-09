@@ -238,3 +238,34 @@ Exit:
 ```text
 x
 ```
+
+
+## Change Log
+
+### 2026-10
+- Config management and registry update method.
+- Moved Marshal handling to PSCredential.
+- Character fixes.
+- Removed FileZilla.
+- Simplified launch options.
+- Updated docs and launcher save behavior.
+
+### 2026-09
+- Added SSH launch via shell script (puttystart.sh).
+
+### 2026-08
+- Added host name and fixed password startup options.
+- Config now saves to a temp file first; fixed saving on first script run.
+- Changed the usage dialog; added readme and usage directions.
+- Added running of the tool against the default host.
+- Added connect by store number, FQDN or IP; fixed a pathing error.
+- Credential management updates.
+- Example TinyTerm connection creation.
+- PuTTY and TinyTerm session improvements; PuTTY font resize.
+- TinyTerm template.
+- Port management and credential management.
+- Non-standard store password management; added verbose command and documentation.
+- Config file memory (added, reverted, then re-added).
+
+### 2026-07
+- Initial release: new SC PuTTY startup script.
