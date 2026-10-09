@@ -88,12 +88,13 @@ When a previous store is available, enter a two-letter endpoint code to connect 
 
 ### Tuna Endpoint
 
-The `tuna` endpoint, such as `tuna.ci123` (resolves to `tuna.ci123.kroger.com`), connects without credentials:
+The `tuna` endpoint, such as `tuna.ci123` (resolves to `tuna.ci123.kroger.com`), connects with the current user ID and no password:
 
-- No username or password is sent, and nothing is copied to the clipboard.
-- PuTTY launches without the `tcxSky` profile (`putty -ssh <host> -P <port>`).
-- TinyTerm launches with its auto-login disabled.
-- WinSCP is not supported for tuna and is skipped with a warning.
+- Only the current user ID, in lower case, is sent (not the saved username). The PowerShell launcher uses the Windows user; the Bash launcher uses the logged-in Linux user. No password is sent, and nothing is copied to the clipboard.
+- PuTTY launches without the `tcxSky` profile (`putty -ssh <user>@<host> -P <port>`).
+- TinyTerm launches with the user ID filled in and its auto-login disabled.
+- WinSCP (PowerShell) and sftp (Bash) are not supported for tuna and are skipped with a warning.
+- The Bash launcher runs plain `ssh <user>@<host>` (no `sshpass`, and key authentication is not disabled).
 
 ## Store Commands
 
@@ -252,7 +253,7 @@ x
 ## Change Log
 
 ### 2026-10
-- Added `tuna` endpoint support: connects without credentials or the `tcxSky` profile, and skips WinSCP.
+- Added `tuna` endpoint support: connects with the current user ID only (no password) and without the `tcxSky` profile, and skips WinSCP/sftp. Applied to both `puttystart.ps1` and `puttystart.sh`.
 - Config management and registry update method.
 - Moved Marshal handling to PSCredential.
 - Character fixes.
