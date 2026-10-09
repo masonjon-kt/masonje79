@@ -94,6 +94,10 @@ deobfuscate() { printf '%s' "$1" | base64 -d 2>/dev/null; }
 
 # --------------------------------------------------------------- config i/o --
 save_config() {
+    if [[ "$lastStore" =~ ^([a-zA-Z]{2,})\.([a-zA-Z]{2}[0-9]{3})$ ]]; then
+        lastEnvironment="${BASH_REMATCH[1],,}"
+        lastStore="${BASH_REMATCH[2]}"
+    fi
     local tmp="$CONFIG_PATH.$$.tmp"
     umask 077
     {

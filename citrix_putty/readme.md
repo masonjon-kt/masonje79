@@ -38,12 +38,12 @@ cd "$env:USERPROFILE\Desktop\"
 .\puttystart.ps1
 ```
 
-The script creates `puttystart.cfg` in that same Desktop folder. Keep both `puttystart.ps1` and `puttystart.cfg` together so saved tools, preferences, and credentials are available the next time the script is run.
+The PowerShell script stores its active config under `%APPDATA%\puttystart\puttystart.cfg`, so it does not need to be copied beside the script. If a legacy `puttystart.cfg` is present beside the script and no AppData config exists, the script imports it on startup.
 
 
 ## First Startup
 
-On startup, the script loads saved credentials and preferences from `puttystart.cfg` in the same directory as the script.
+On startup, the PowerShell script loads saved credentials and preferences from `%APPDATA%\puttystart\puttystart.cfg`.
 
 If a valid password saved today is available, it is reused. Otherwise, the script opens the password portal and prompts for credentials. The default username is `4690`.
 
@@ -84,7 +84,7 @@ mc.ci123.kroger.com
 
 To connect through another endpoint, enter it explicitly with the store, such as `cc.ci123`.
 
-When a previous store is available, enter a two-letter endpoint code to connect to that same store through a different endpoint. For example, with `ci123` as the previous store, entering `cc` connects to `cc.ci123.kroger.com`. Prefix the code with a tool command to launch only that tool, such as `w cc` for WinSCP.
+When a previous store is available, enter a two-letter endpoint code to connect to that same store through a different endpoint. For example, with `ci123` as the previous store, entering `cc` connects to `cc.ci123.kroger.com`. This shorthand does not change the saved default. Prefix the code with a tool command to launch only that tool, such as `w cc` for WinSCP.
 
 ## Store Commands
 
@@ -173,20 +173,27 @@ The portal is opened at most once during startup, even when the saved password i
 
 ## Configuration File
 
-The script creates `puttystart.cfg` beside `puttystart.ps1`. It stores preferences and encrypted password data, including:
+The PowerShell launcher stores its config at `%APPDATA%\puttystart\puttystart.cfg`. A legacy `puttystart.cfg` beside the script is imported there if no active config exists. The Bash launcher stores its separate config in `puttystart.sh.cfg` beside `puttystart.sh`.
+
+Both configs store terminal and file-transfer preferences, port, last store, endpoint, and other launcher settings. The store and endpoint are saved separately: for example, `LastStore=ci005` and `LastEnvironment=cc`. Entering `cc.ci005` updates those defaults; entering a bare store ID such as `ci003` saves it with the `mc` endpoint. A two-letter endpoint shorthand such as `fc` changes only that connection.
+
+The PowerShell config contains a password encrypted for the same Windows user account. The Bash config base64-encodes the password, which is not encryption, and limits access to the current user where supported. Do not edit password fields manually.
+
+The PowerShell script writes through a temporary file and replaces the active config after a complete write. The Bash script uses the same temporary-file replacement pattern.
+
+The configuration includes:
 
 - Terminal selection
 - File-transfer selection
 - Port
 - TinyTerm template path
 - Username
-- Encrypted password
+- Password data
 - Password date
 - Last store
 - Last endpoint
 - Static store credentials
 
-Do not edit the encrypted password fields manually. The script writes the configuration through a temporary file and replaces the active file after a complete write, which helps prevent an interrupted save from leaving a partial configuration.
 
 ## Common Examples
 

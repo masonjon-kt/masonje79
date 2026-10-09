@@ -582,6 +582,10 @@ if (-not (Test-Path -LiteralPath $configPath) -and (Test-Path -LiteralPath $lega
 # Helper: save all settings to config file
 function Save-Config {
     param($termChoice, $ftChoice, $username, $securePassword, $lastStore = "", $lastEnvironment = "mc", $staticCredsTable = $null, $port = "22", $tinyTermTemplate = "")
+    if ($lastStore -match '^([a-zA-Z]{2,})\.([a-zA-Z]{2}\d{3})$') {
+        $lastEnvironment = $Matches[1].ToLower()
+        $lastStore = $Matches[2]
+    }
     $encryptedPw = $securePassword | ConvertFrom-SecureString
     $today = (Get-Date).ToString("yyyy-MM-dd")
     $lines = @(
