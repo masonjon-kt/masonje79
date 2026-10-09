@@ -960,9 +960,20 @@ while ($true) {
     # Save last store and endpoint to config
     Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
 
+    # Tuna endpoint does not use credentials or the tcxSky profile
+    $noCreds = ($Environment -eq "tuna") -or ($TargetHost -like "tuna.*")
+    if ($noCreds -and $launchWinSCP) {
+        Write-Host "WinSCP is not supported for tuna - skipping." -ForegroundColor Yellow
+        $launchWinSCP = $false
+    }
+
     # Resolve credentials: static per-store overrides daily PWD
     $storeKey = $Store.ToLower()
-    if ($staticCreds.ContainsKey($storeKey) -and $staticCreds[$storeKey].Password) {
+    if ($noCreds) {
+        $ConnUsername = ""
+        $ConnPassword = ""
+        Write-Host "Connecting to: $TargetHost  [NO credentials - tuna]" -ForegroundColor Green
+    } elseif ($staticCreds.ContainsKey($storeKey) -and $staticCreds[$storeKey].Password) {
         $ConnUsername = $staticCreds[$storeKey].Username
         $ConnPassword = $staticCreds[$storeKey].Password
         Write-Host "Connecting to: $TargetHost as $ConnUsername  [STATIC credentials]" -ForegroundColor Green
@@ -973,14 +984,21 @@ while ($true) {
     }
 
     # Copy password to clipboard
-    $ConnPassword | Set-Clipboard
-    Write-Host "Password copied to clipboard." -ForegroundColor Green
+    if (-not $noCreds) {
+        $ConnPassword | Set-Clipboard
+        Write-Host "Password copied to clipboard." -ForegroundColor Green
+    }
 
     # Launch PuTTY if selected
     if ($launchPutty) {
         Write-Host "Launching PuTTY..." -ForegroundColor Cyan
-        if ($Verbose) { Write-Host "  CMD: `"$puttyPath`" -load tcxSky -ssh $ConnUsername@$TargetHost -P $Port -pw *****" -ForegroundColor DarkYellow }
-        & $puttyPath -load "tcxSky" -ssh "$ConnUsername@$TargetHost" -P $Port -pw $ConnPassword
+        if ($noCreds) {
+            if ($Verbose) { Write-Host "  CMD: `"$puttyPath`" -ssh $TargetHost -P $Port" -ForegroundColor DarkYellow }
+            & $puttyPath -ssh $TargetHost -P $Port
+        } else {
+            if ($Verbose) { Write-Host "  CMD: `"$puttyPath`" -load tcxSky -ssh $ConnUsername@$TargetHost -P $Port -pw *****" -ForegroundColor DarkYellow }
+            & $puttyPath -load "tcxSky" -ssh "$ConnUsername@$TargetHost" -P $Port -pw $ConnPassword
+        }
     }
 
     # Launch TinyTerm if selected
@@ -994,8 +1012,8 @@ while ($true) {
                 elseif ($_ -like "user=*")     { "user=$ConnUsername" }
                 elseif ($_ -like "password=*") { "password=" }
                 elseif ($_ -like "remark=*")   { "remark=$TargetHost" }
-                elseif ($_ -like "login=*")  { "login=1" }
-                elseif ($_ -like "loginsw=*")  { "loginsw=1" }
+                elseif ($_ -like "login=*")  { if ($noCreds) { "login=0" } else { "login=1" } }
+                elseif ($_ -like "loginsw=*")  { if ($noCreds) { "loginsw=0" } else { "loginsw=1" } }
                 elseif ($_ -like "loginW1=*")  { "loginW1=password:" }
                 elseif ($_ -like "loginS1=*")  { "loginS1=$ConnPassword^M" }
                 elseif ($_ -like "loginW2=*")  { "loginW2=password:" }
