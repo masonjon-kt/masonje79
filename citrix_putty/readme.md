@@ -84,7 +84,7 @@ mc.ci123.kroger.com
 
 To connect through another endpoint, enter it explicitly with the store, such as `cc.ci123`.
 
-When a previous store is available, enter a two-letter endpoint code to connect to that same store through a different endpoint. For example, with `ci123` as the previous store, entering `cc` connects to `cc.ci123.kroger.com`. This shorthand does not change the saved default. Prefix the code with a tool command to launch only that tool, such as `w cc` for WinSCP.
+When a previous store is available, enter a two-letter endpoint code, or `tuna`, to connect to that same store through a different endpoint. For example, with `ci123` as the previous store, entering `cc` connects to `cc.ci123.kroger.com` and entering `tuna` connects to `tuna.ci123.kroger.com`. This shorthand does not change the saved default. Prefix the code with a tool command to launch only that tool, such as `w cc` for WinSCP.
 
 ### Tuna Endpoint
 
@@ -254,6 +254,7 @@ x
 
 ### 2026-10
 - Added `tuna` endpoint support: connects with the current user ID only (no password) and without the `tcxSky` profile, and skips WinSCP/sftp. Applied to both `puttystart.ps1` and `puttystart.sh`.
+- Fixed `puttystart.ps1` so typing `tuna` at the store prompt reuses the previous store (for example `mc.ci010` then `tuna` goes to `tuna.ci010.kroger.com`) instead of connecting to host `tuna`.
 - Config management and registry update method.
 - Moved Marshal handling to PSCredential.
 - Character fixes.

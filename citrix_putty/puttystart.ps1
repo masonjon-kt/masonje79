@@ -904,7 +904,7 @@ while ($true) {
         $Environment = $Matches[1].ToLower()
         $lastStore = $Store
         $lastEnvironment = $Environment
-    } elseif ($lastStore -and $storeInput -match '^[a-zA-Z]{2}$') {
+    } elseif ($lastStore -and $storeInput -match '^([a-zA-Z]{2}|tuna)$') {
         $Store = $lastStore
         $Environment = $storeInput.ToLower()
     } else {
