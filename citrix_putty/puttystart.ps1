@@ -788,7 +788,11 @@ while ($true) {
 
     # Prompt for store (accepts special commands)
     $storePrompt = "Store (e.g., ci123 / fc.ci123 / cc / FQDN / IP)"
-    if ($lastStore) { $storePrompt += " [default: $lastEnvironment.$lastStore]" }
+    if ($lastStore) {
+        # Only store numbers use the endpoint prefix; IPs and hostnames are used as entered
+        if ($lastStore -match '^[a-zA-Z]{2}\d{3}$') { $storePrompt += " [default: $lastEnvironment.$lastStore]" }
+        else                                        { $storePrompt += " [default: $lastStore]" }
+    }
 
     $storeInput = (Read-Host $storePrompt).Trim()
 

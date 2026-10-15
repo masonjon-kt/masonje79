@@ -255,6 +255,7 @@ x
 ### 2026-10
 - Added `tuna` endpoint support: connects with the current user ID only (no password) and without the `tcxSky` profile, and skips WinSCP/sftp. Applied to both `puttystart.ps1` and `puttystart.sh`.
 - Fixed `puttystart.ps1` so typing `tuna` at the store prompt reuses the previous store (for example `mc.ci010` then `tuna` goes to `tuna.ci010.kroger.com`) instead of connecting to host `tuna`.
+- Fixed the store prompt default in `puttystart.ps1` so an IP address or FQDN is shown as entered (for example `[default: 10.158.217.3]` or `[default: fc.ci353.kroger.com]`) instead of with the endpoint prefixed (`fc.10.158.217.3`, `fc.fc.ci353.kroger.com`).
 - Config management and registry update method.
 - Moved Marshal handling to PSCredential.
 - Character fixes.
