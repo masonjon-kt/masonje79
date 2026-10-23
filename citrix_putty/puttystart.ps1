@@ -35,6 +35,12 @@ function ConvertTo-PlainText {
     return $credential.GetNetworkCredential().Password
 }
 
+# Helper: open the password portal in Edge
+function Open-PasswordPortal {
+    $dataCenter = if ($PortalDataCenter -eq "hdc") { "hdc" } else { "cdc" }
+    Start-Process "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" "https://possecurity-prod.cdengpos.rch-$dataCenter-cdeprod.kroger.com/#/"
+}
+
 # Helper: prompt for credentials and return them
 function Request-Credentials {
     $u = Read-Host "Enter username [default: 4690]"
@@ -581,7 +587,7 @@ if (-not (Test-Path -LiteralPath $configPath) -and (Test-Path -LiteralPath $lega
 
 # Helper: save all settings to config file
 function Save-Config {
-    param($termChoice, $ftChoice, $username, $securePassword, $lastStore = "", $lastEnvironment = "mc", $staticCredsTable = $null, $port = "22", $tinyTermTemplate = "")
+    param($termChoice, $ftChoice, $username, $securePassword, $lastStore = "", $lastEnvironment = "mc", $staticCredsTable = $null, $port = "22", $tinyTermTemplate = "", $skipPwdPrompt = $false, $portalDataCenter = "cdc")
     if ($lastStore -match '^([a-zA-Z]{2,})\.([a-zA-Z]{2}\d{3})$') {
         $lastEnvironment = $Matches[1].ToLower()
         $lastStore = $Matches[2]
@@ -598,7 +604,9 @@ function Save-Config {
         "PwdEncrypted=$encryptedPw",
         "PwdDate=$today",
         "LastStore=$lastStore",
-        "LastEnvironment=$lastEnvironment"
+        "LastEnvironment=$lastEnvironment",
+        "SkipPwdPrompt=$(if ($skipPwdPrompt) { '1' } else { '0' })",
+        "PortalDataCenter=$portalDataCenter"
     )
     if ($staticCredsTable) {
         foreach ($store in $staticCredsTable.Keys | Sort-Object) {
@@ -626,6 +634,8 @@ $Username = "4690"
 $Password = $null
 $SecurePassword = $null
 $portalOpened = $false
+$SkipPwdPrompt = $false
+$PortalDataCenter = "cdc"
 $today = (Get-Date).ToString("yyyy-MM-dd")
 
 if (Test-Path $configPath) {
@@ -650,24 +660,25 @@ if (Test-Path $configPath) {
         $lastStore = $Matches[2]
     }
     if ($cfg.TinyTermTemplate)    { $TinyTermTemplate = $cfg.TinyTermTemplate }
+    if ($cfg.SkipPwdPrompt -eq "1") { $SkipPwdPrompt = $true }
+    if ($cfg.PortalDataCenter -eq "hdc") { $PortalDataCenter = "hdc" }
     # Command-line -Port takes precedence; fall back to config, then default 22
     if (-not $Port) {
         if ($cfg.Port)            { $Port = $cfg.Port }
         else                      { $Port = "22" }
     }
-    if ($cfg.PwdEncrypted -and $cfg.PwdDate -eq $today) {
-        # Same day - decrypt and reuse stored password
+    if ($cfg.PwdEncrypted -and ($SkipPwdPrompt -or $cfg.PwdDate -eq $today)) {
+        # Same day, or expiry check disabled - decrypt and reuse stored password
         try {
             $SecurePassword = $cfg.PwdEncrypted | ConvertTo-SecureString
             $Password = ConvertTo-PlainText $SecurePassword
-            Write-Host "Using saved credentials for $Username (saved today)." -ForegroundColor Green
+            Write-Host "Using saved credentials for $Username$(if ($SkipPwdPrompt) { ' (daily prompt skipped)' } else { ' (saved today)' })." -ForegroundColor Green
         } catch {
             Write-Host "Could not decrypt saved password. Please re-enter credentials." -ForegroundColor Yellow
         }
     } elseif ($cfg.PwdDate -and $cfg.PwdDate -ne $today) {
         Write-Host "Saved password is from $($cfg.PwdDate). Opening password portal..." -ForegroundColor Yellow
-        Set-Location "C:\Program Files (x86)\Microsoft\Edge\Application\"
-        Start-Process "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" "https://possecurity-prod.cdengpos.rch-cdc-cdeprod.kroger.com/#/"
+        Open-PasswordPortal
         $portalOpened = $true
     }
 
@@ -698,14 +709,14 @@ $SftpPort = $Port
 if (-not $Password) {
     Write-Host "Opening password portal..." -ForegroundColor Yellow
     if (-not $portalOpened) {
-        Start-Process "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" "https://possecurity-prod.cdengpos.rch-cdc-cdeprod.kroger.com/#/"
+        Open-PasswordPortal
         $portalOpened = $true
     }
     $creds = Request-Credentials
     $Username      = $creds.Username
     $Password      = $creds.Password
     $SecurePassword = $creds.SecurePassword
-    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
+    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate -skipPwdPrompt $SkipPwdPrompt -portalDataCenter $PortalDataCenter
 }
 
 # Tool selection loop
@@ -752,7 +763,7 @@ while ($true) {
 
         $savedTermChoice = $termChoice
         $savedFtChoice   = $ftChoice
-        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
+        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate -skipPwdPrompt $SkipPwdPrompt -portalDataCenter $PortalDataCenter
 
         # --- Verbose toggle ---
         $verboseToggle = Read-Host "Verbose mode (shows launch commands) [current: $(if($Verbose){'ON'}else{'OFF'})] - press Enter to keep, or type 'on'/'off' to change"
@@ -836,15 +847,19 @@ while ($true) {
         Write-Host "3. Add/update static credentials for a store" -ForegroundColor White
         Write-Host "4. Remove static credentials for a store" -ForegroundColor White
         Write-Host "5. List stores with static credentials" -ForegroundColor White
-        Write-Host "6. Exit" -ForegroundColor White
-        $credAction = Read-Host "Select (1-6)"
+        Write-Host "6. Toggle daily password check (currently $(if ($SkipPwdPrompt) { 'OFF - reusing saved password' } else { 'ON - expires daily' }))" -ForegroundColor White
+        Write-Host "7. Toggle password portal data center (currently $($PortalDataCenter.ToUpper()))" -ForegroundColor White
+        Write-Host "8. Exit" -ForegroundColor White
+        $credAction = Read-Host "Select (1-8)"
         switch ($credAction) {
             "1" {
+                Write-Host "Opening password portal..." -ForegroundColor Yellow
+                Open-PasswordPortal
                 $creds = Request-Credentials
                 $Username       = $creds.Username
                 $Password       = $creds.Password
                 $SecurePassword = $creds.SecurePassword
-                Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
+                Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate -skipPwdPrompt $SkipPwdPrompt -portalDataCenter $PortalDataCenter
                 Write-Host "Daily credentials updated." -ForegroundColor Green
             }
             "2" {
@@ -866,7 +881,7 @@ while ($true) {
                     } while ($staticSp.Length -eq 0)
                     $staticP = ConvertTo-PlainText $staticSp
                     $staticCreds[$storeKey] = @{ Username = $staticUser; Password = $staticP; SecurePassword = $staticSp }
-                    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
+                    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate -skipPwdPrompt $SkipPwdPrompt -portalDataCenter $PortalDataCenter
                     Write-Host "Static credentials saved for $storeKey." -ForegroundColor Green
                 }
             }
@@ -874,7 +889,7 @@ while ($true) {
                 $storeKey = (Read-Host "Enter store number to remove").ToLower()
                 if ($staticCreds.ContainsKey($storeKey)) {
                     $staticCreds.Remove($storeKey)
-                    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
+                    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate -skipPwdPrompt $SkipPwdPrompt -portalDataCenter $PortalDataCenter
                     Write-Host "Static credentials removed for $storeKey." -ForegroundColor Green
                 } else {
                     Write-Host "No static credentials found for '$storeKey'." -ForegroundColor Yellow
@@ -890,16 +905,26 @@ while ($true) {
                     }
                 }
             }
-            "6" { break }
+            "6" {
+                $SkipPwdPrompt = -not $SkipPwdPrompt
+                Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate -skipPwdPrompt $SkipPwdPrompt -portalDataCenter $PortalDataCenter
+                Write-Host "Daily password check is now $(if ($SkipPwdPrompt) { 'OFF - the saved password will be reused every run' } else { 'ON - the saved password expires daily' })." -ForegroundColor Green
+            }
+            "7" {
+                $PortalDataCenter = if ($PortalDataCenter -eq "hdc") { "cdc" } else { "hdc" }
+                Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate -skipPwdPrompt $SkipPwdPrompt -portalDataCenter $PortalDataCenter
+                Write-Host "Password portal data center is now $($PortalDataCenter.ToUpper())." -ForegroundColor Green
+            }
+            "8" { break }
         }
-        if ($credAction -eq "6" -or $credAction -eq "2") { break }
+        if ($credAction -eq "8" -or $credAction -eq "2") { break }
         }
         continue
     }
     if ($storeInput -eq "e") {
         $newEnv = Read-Host "Enter endpoint (mc, cc, fc, etc.) [default: $lastEnvironment]"
         if ($newEnv) { $lastEnvironment = $newEnv }
-        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
+        Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate -skipPwdPrompt $SkipPwdPrompt -portalDataCenter $PortalDataCenter
         continue
     }
 
@@ -962,7 +987,7 @@ while ($true) {
     }
 
     # Save last store and endpoint to config
-    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate
+    Save-Config -termChoice $savedTermChoice -ftChoice $savedFtChoice -username $Username -securePassword $SecurePassword -lastStore $lastStore -lastEnvironment $lastEnvironment -staticCredsTable $staticCreds -port $Port -tinyTermTemplate $TinyTermTemplate -skipPwdPrompt $SkipPwdPrompt -portalDataCenter $PortalDataCenter
 
     # Tuna endpoint passes the current Windows user ID only (no password) and does not use the tcxSky profile
     $noCreds = ($Environment -eq "tuna") -or ($TargetHost -like "tuna.*")

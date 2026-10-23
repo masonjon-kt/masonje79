@@ -171,7 +171,9 @@ Available actions:
 3. Add or update static credentials for a store
 4. Remove static credentials for a store
 5. List stores with static credentials
-6. Exit the credential menu
+6. Toggle the daily password check on/off
+7. Toggle the password portal data center (cdc/hdc)
+8. Exit the credential menu
 
 Static credentials override the daily credentials only for the matching store.
 
@@ -180,6 +182,10 @@ Static credentials override the daily credentials only for the matching store.
 The script treats a password as current only when the saved `PwdDate` matches the current date. When the date is expired, it opens the password portal and requests updated credentials.
 
 The portal is opened at most once during startup, even when the saved password is expired and the later credential prompt is also required.
+
+Credential menu option 6 toggles `SkipPwdPrompt`. When it is ON (set to 1), this daily expiry check is disabled entirely: the saved password is reused on every run regardless of `PwdDate`, and the portal never opens automatically. The setting can also be edited directly in `%APPDATA%\puttystart\puttystart.cfg`. This has no effect on the Bash launcher.
+
+The portal URL points at one of two data centers: `cdc` (`https://possecurity-prod.cdengpos.rch-cdc-cdeprod.kroger.com/`, the default) or `hdc` (`https://possecurity-prod.cdengpos.rch-hdc-cdeprod.kroger.com/`). Credential menu option 7 toggles between them and is saved as `PortalDataCenter` in the config. The portal opens automatically at startup when the saved password is expired, and also when choosing credential menu option 1 (Update daily password).
 
 ## Configuration File
 
